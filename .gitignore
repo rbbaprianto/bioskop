@@ -1,0 +1,5 @@
+/config/
+/film/
+__pycache__/
+*.log
+.env
