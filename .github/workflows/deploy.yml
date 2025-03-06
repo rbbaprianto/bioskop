@@ -52,20 +52,6 @@ jobs:
           scope = drive
           token = {"access_token":"${{ secrets.RCLONE_ACCESS_TOKEN }}","refresh_token":"${{ secrets.RCLONE_REFRESH_TOKEN }}"}
           EOF
-      - name: Ensure Fly.io Volume in SIN
-        run: |
-          export FLYCTL_INSTALL="/home/runner/.fly"
-          export PATH="$FLYCTL_INSTALL/bin:$PATH"
-
-          # Cek apakah volume sudah ada
-          EXISTING_VOLUME=$(flyctl volumes list --json | jq -r '.[] | select(.Name=="film_volume") | .ID')
-
-          if [ -z "$EXISTING_VOLUME" ]; then
-            echo "📦 Volume belum ada, membuat baru di region SIN..."
-            flyctl volumes create film_volume --size 10 --region sin --yes
-          else
-            echo "✅ Volume sudah ada: $EXISTING_VOLUME"
-          fi
           
       - name: Deploy Fly.io App
         env:
@@ -78,24 +64,9 @@ jobs:
           RCLONE_REFRESH_TOKEN: ${{ secrets.RCLONE_REFRESH_TOKEN }}
           FLY_ACCESS_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
-          source ~/.bashrc
-          /home/runner/.fly/bin/flyctl deploy --remote-only
-
-      - name: Attach Volume to Machine
-        run: |
-          source ~/.bashrc
-          
-          # Ambil Machine ID setelah deploy
-          MACHINE_ID=$(flyctl machines list --json | jq -r '.[0].id')
-
-          if [ -n "$MACHINE_ID" ]; then
-            echo "🔄 Menghubungkan volume ke mesin: $MACHINE_ID"
-            flyctl machines update $MACHINE_ID --mount-point /film
-          else
-            echo "❌ Tidak ada mesin yang tersedia untuk attach volume!"
-            exit 1
-          fi
-
+          export FLYCTL_INSTALL="/home/runner/.fly"
+          export PATH="$FLYCTL_INSTALL/bin:$PATH"
+          flyctl deploy --remote-only --region sin
 
       - name: Start Telegram Bot
         run: nohup python3 /app/bot/bot.py & 
