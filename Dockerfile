@@ -8,3 +8,7 @@ RUN pip3 install python-telegram-bot
 
 # Jalankan bot sebagai entrypoint
 CMD ["python3", "/app/bot/bot.py"]
+
+# Salin extend_volume.sh ke dalam container
+COPY scripts/extend_volume.sh /scripts/extend_volume.sh
+RUN chmod +x /scripts/extend_volume.sh
