@@ -50,10 +50,19 @@ jobs:
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
 
           echo "🗑️ Menghapus volume yang tidak terpakai..."
-          flyctl volumes list --json | jq -r '.[] | select(.AttachedMachine == null) | .ID' | while read vol; do
-            echo "🗑️ Menghapus volume: $vol"
-            flyctl volumes delete $vol --yes
-          done
+          UNATTACHED_VOLUMES=$(flyctl volumes list --json | jq -r '.[] | select(.AttachedMachine == null) | .ID')
+
+          if [ -n "$UNATTACHED_VOLUMES" ]; then
+            echo "$UNATTACHED_VOLUMES" | while read vol; do
+              if [ -n "$vol" ] && [ "$vol" != "null" ]; then
+                echo "🗑️ Menghapus volume: $vol"
+                flyctl volumes delete $vol --yes
+              fi
+            done
+          else
+            echo "✅ Tidak ada volume yang perlu dihapus."
+          fi
+
 
       - name: Ensure Volume Exists
         id: check_volume
