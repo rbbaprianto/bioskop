@@ -4,6 +4,17 @@ on:
     branches:
       - main
 jobs:
+  cleanup-old-workflows:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete old workflow runs
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          retain_days: 0  # Hapus langsung
+          keep_minimum_runs: 1  # Simpan hanya 1 workflow terakhir
+
   deploy:
     runs-on: ubuntu-latest
     steps:
@@ -27,7 +38,7 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
           source ~/.bashrc
-          /home/runner/.fly/bin/flyctl auth token
+          flyctl auth whoami || flyctl auth login --access-token "${{ secrets.FLY_API_TOKEN }}"
 
       - name: Use Rclone Tokens from Secrets
         run: |
