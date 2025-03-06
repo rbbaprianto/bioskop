@@ -133,7 +133,7 @@ jobs:
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
 
-          EXISTING_VOLUME=$(flyctl volumes list --json | jq -r '.[] | select(.name=="film_volume") | sort_by(.created_at) | .id' | tail -n1)
+          EXISTING_VOLUME=$(flyctl volumes list --app "$FLY_APP_NAME" --json | jq -r '.[] | select(.name=="film_volume") | sort_by(.created_at) | .id' | tail -n1)
 
           if [ -z "$EXISTING_VOLUME" ] || [ "$EXISTING_VOLUME" = "null" ]; then
             echo "📦 Volume belum ada, membuat baru di region SIN..."
@@ -171,8 +171,7 @@ jobs:
           fi
 
           echo "🔄 Updating Machine ID: $MACHINE_ID"
-          flyctl machines update "$MACHINE_ID" --app "$FLY_APP_NAME" --image "registry.fly.io/$FLY_APP_NAME:latest"
-
+          flyctl machines update "$MACHINE_ID" --app "$FLY_APP_NAME" --image "registry.fly.io/$FLY_APP_NAME:latest" --yes
 
       - name: Restart Fly.io App
         run: |
