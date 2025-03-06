@@ -145,9 +145,30 @@ jobs:
                -d "text=✅ Deployment sukses! Aplikasi telah diperbarui dan berjalan di Fly.io 🚀"
 
       - name: Schedule Volume Check
+        env:
+          FLY_APP_NAME: ${{ secrets.FLY_APP_NAME }}
         run: |
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
-          
+
+          echo "⏳ Mengecek apakah aplikasi memiliki VM yang aktif..."
+          ACTIVE_MACHINES=$(flyctl machines list --app "$FLY_APP_NAME" --json | jq -r '[.[] | select(.state == "started")] | length')
+
+          if [ "$ACTIVE_MACHINES" -eq 0 ]; then
+            echo "❌ Tidak ada VM aktif! Menjalankan VM terlebih dahulu..."
+            MACHINE_ID=$(flyctl machines list --app "$FLY_APP_NAME" --json | jq -r '.[0].id')
+            if [ -n "$MACHINE_ID" ] && [ "$MACHINE_ID" != "null" ]; then
+              echo "▶ Menjalankan VM dengan ID: $MACHINE_ID"
+              flyctl machines start "$MACHINE_ID"
+              sleep 10  # Tunggu 10 detik agar VM siap
+            else
+              echo "⚠ Tidak ada VM yang ditemukan, pengecekan volume dibatalkan!"
+              exit 1
+            fi
+          else
+            echo "✅ VM sudah aktif, melanjutkan pengecekan volume..."
+          fi
+
           echo "⏳ Menjadwalkan pengecekan volume..."
           flyctl ssh console --command "bash /scripts/extend_volume.sh"
+
