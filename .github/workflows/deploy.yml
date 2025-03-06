@@ -49,20 +49,22 @@ jobs:
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
 
-          echo "🗑️ Menghapus volume yang tidak terpakai..."
-          UNATTACHED_VOLUMES=$(flyctl volumes list --json | jq -r '.[] | select(.AttachedMachine == null) | .ID')
+          echo "🔄 Memeriksa volume yang tidak digunakan..."
+          flyctl volumes list --json | jq -r '.[] | select(.AttachedMachine == null) | .ID' > unused_volumes.txt
 
-          if [ -n "$UNATTACHED_VOLUMES" ]; then
-            echo "$UNATTACHED_VOLUMES" | while read vol; do
+          if [ -s unused_volumes.txt ]; then
+            cat unused_volumes.txt | while read vol; do
               if [ -n "$vol" ] && [ "$vol" != "null" ]; then
                 echo "🗑️ Menghapus volume: $vol"
                 flyctl volumes delete $vol --yes
+                sleep 3  # Tunggu agar perubahan tersinkronisasi
               fi
             done
           else
             echo "✅ Tidak ada volume yang perlu dihapus."
           fi
 
+          rm -f unused_volumes.txt
 
       - name: Ensure Volume Exists
         id: check_volume
@@ -76,10 +78,12 @@ jobs:
             echo "📦 Volume belum ada, membuat baru di region SIN..."
             NEW_VOLUME=$(flyctl volumes create film_volume --size 10 --region sin --yes | awk '/ID:/ {print $2}')
             echo "VOLUME_ID=$NEW_VOLUME" >> $GITHUB_ENV
+            sleep 10  # Tunggu agar volume benar-benar tersedia
           else
             echo "✅ Volume sudah ada: $EXISTING_VOLUME"
             echo "VOLUME_ID=$EXISTING_VOLUME" >> $GITHUB_ENV
           fi
+
 
       - name: Check Existing Machine
         id: check_machine
