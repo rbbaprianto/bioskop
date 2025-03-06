@@ -78,10 +78,10 @@ jobs:
 
           if [ -z "$APP_EXISTS" ]; then
             echo "🚀 Aplikasi belum ada, melakukan deploy pertama kali..."
-            flyctl deploy --remote-only --region sin
+            flyctl deploy --remote-only --regions sin
           else
             echo "🔄 Aplikasi sudah ada, melakukan update..."
-            flyctl deploy --remote-only --region sin --strategy immediate
+            flyctl deploy --remote-only --regions sin --strategy immediate
           fi
 
       - name: Restart App After Update
