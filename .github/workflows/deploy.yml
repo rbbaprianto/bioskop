@@ -24,18 +24,17 @@ jobs:
 
       - name: Install Dependencies
         run: |
-	  curl -L https://fly.io/install.sh | sh
-	  export FLYCTL_INSTALL="/home/runner/.fly"
-	  export PATH="$FLYCTL_INSTALL/bin:$PATH"
-	  echo 'export FLYCTL_INSTALL="/home/runner/.fly"' >> ~/.bashrc
-	  echo 'export PATH="$FLYCTL_INSTALL/bin:$PATH"' >> ~/.bashrc
-	  source ~/.bashrc
+          curl -L https://fly.io/install.sh | sh
+          export FLYCTL_INSTALL="/home/runner/.fly"
+          export PATH="$FLYCTL_INSTALL/bin:$PATH"
+          echo 'export FLYCTL_INSTALL="/home/runner/.fly"' >> ~/.bashrc
+          echo 'export PATH="$FLYCTL_INSTALL/bin:$PATH"' >> ~/.bashrc
+          source ~/.bashrc
 
-	  curl https://rclone.org/install.sh | sudo bash
-
-	  sudo apt-get update
-
-	  # Hapus containerd jika ada konflik
+          curl https://rclone.org/install.sh | sudo bash
+          sudo apt-get update # sudo apt-get install -y jq gh docker.io
+          
+          # Hapus containerd jika ada konflik
 	  if dpkg -l | grep -q "^ii  containerd "; then
 	    echo "⚠️  Menghapus package containerd untuk menghindari konflik..."
 	    sudo apt-get remove -y containerd
