@@ -30,9 +30,9 @@ jobs:
           echo 'export FLYCTL_INSTALL="/home/runner/.fly"' >> ~/.bashrc
           echo 'export PATH="$FLYCTL_INSTALL/bin:$PATH"' >> ~/.bashrc
           source ~/.bashrc
-          
+
           curl https://rclone.org/install.sh | sudo bash
-          sudo apt-get update && sudo apt-get install -y jq gh
+          sudo apt-get update && sudo apt-get install -y jq gh docker.io
 
       - name: Authenticate Fly.io
         env:
@@ -44,19 +44,18 @@ jobs:
           echo "FLY_ACCESS_TOKEN=${{ secrets.FLY_API_TOKEN }}" >> $GITHUB_ENV
           flyctl auth whoami || flyctl auth login --access-token "${{ secrets.FLY_API_TOKEN }}"
 
-      - name: Clean Up Unused Volumes
+      - name: Clean Up Unused Volumes (Force Delete)
         run: |
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
 
-          echo "🗑️  Menghapus volume yang tidak terpakai..."
+          echo "🗑️  Menghapus volume yang tidak terpakai secara paksa..."
           flyctl volumes list --json | jq -r '.[] | select(.attached_machine_id == null and .state == "created") | .id' | while read vol; do
             if [ ! -z "$vol" ]; then
-              echo "🗑️  Menghapus volume: $vol"
+              echo "🗑️  Menghapus volume: $vol secara paksa"
               flyctl volumes delete $vol --yes
             fi
           done
-
 
       - name: Ensure Volume Exists
         id: check_volume
@@ -64,26 +63,7 @@ jobs:
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
 
-          EXISTING_VOLUME=$(flyctl volumes list --json | jq -r '.[] | select(.name=="film_volume") | .id')
-
-          if [ -z "$EXISTING_VOLUME" ]; then
-            echo "📦 Volume belum ada, membuat baru di region SIN..."
-            NEW_VOLUME=$(flyctl volumes create film_volume --size 5 --region sin --yes | awk '/id:/ {print $2}')
-            echo "VOLUME_ID=$NEW_VOLUME" >> $GITHUB_ENV
-            sleep 10  # Tunggu agar volume benar-benar tersedia
-          else
-            echo "✅ Volume sudah ada: $EXISTING_VOLUME"
-            echo "VOLUME_ID=$EXISTING_VOLUME" >> $GITHUB_ENV
-          fi
-
-
-      - name: Ensure Volume Exists
-        run: |
-          export FLYCTL_INSTALL="/home/runner/.fly"
-          export PATH="$FLYCTL_INSTALL/bin:$PATH"
-
-          # Cek apakah ada volume yang tersedia
-          EXISTING_VOLUME=$(flyctl volumes list --json | jq -r 'select(length > 0) | map(select(.name=="film_volume")) | sort_by(.created_at) | last | .id // empty')
+          EXISTING_VOLUME=$(flyctl volumes list --json | jq -r '[.[] | select(.name=="film_volume") | sort_by(.created_at)] | last | .id // empty')
 
           if [ -z "$EXISTING_VOLUME" ]; then
             echo "📦 Volume belum ada, membuat baru di region SIN..."
@@ -95,15 +75,28 @@ jobs:
             echo "VOLUME_ID=$EXISTING_VOLUME" >> $GITHUB_ENV
           fi
 
-
-
-      - name: Push Docker Image to Fly.io
+      - name: Check Existing Machine
+        id: check_machine
         run: |
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
 
-          echo "🔄 Pushing image to Fly.io registry..."
-          docker tag $FLY_APP_NAME registry.fly.io/$FLY_APP_NAME:latest
+          EXISTING_MACHINE=$(flyctl machines list --json | jq -r '.[0].id // empty')
+
+          if [ -n "$EXISTING_MACHINE" ]; then
+            echo "✅ Mesin ditemukan: $EXISTING_MACHINE"
+            echo "MACHINE_ID=$EXISTING_MACHINE" >> $GITHUB_ENV
+          else
+            echo "🚀 Tidak ada mesin, akan membuat baru..."
+            echo "MACHINE_ID=" >> $GITHUB_ENV
+          fi
+
+      - name: Build & Push Docker Image
+        run: |
+          echo "🔄 Building Docker image..."
+          docker build -t registry.fly.io/$FLY_APP_NAME:latest .
+          
+          echo "🔄 Pushing image ke Fly.io registry..."
           docker push registry.fly.io/$FLY_APP_NAME:latest
 
       - name: Deploy or Update App
@@ -127,12 +120,7 @@ jobs:
           else
             echo "🚀 Membuat mesin baru di SIN..."
             sleep 5  # Tunggu agar volume tersedia
-
-            # 🔹 **Tambahkan langkah push image ke Fly.io registry di sini**
-            echo "🔄 Pushing image to Fly.io registry..."
-            docker tag $FLY_APP_NAME registry.fly.io/$FLY_APP_NAME:latest
-            docker push registry.fly.io/$FLY_APP_NAME:latest
-
+            
             flyctl machine run registry.fly.io/$FLY_APP_NAME:latest \
               --app $FLY_APP_NAME \
               --region sin \
@@ -142,7 +130,6 @@ jobs:
               --restart always
           fi
 
-
       - name: Restart App After Update
         if: env.MACHINE_ID != ''
         run: |
@@ -151,6 +138,21 @@ jobs:
           
           echo "🔄 Restarting Fly.io Machine"
           flyctl machines restart --app $FLY_APP_NAME --select
+
+      - name: Ensure App IP is Allocated
+        run: |
+          export FLYCTL_INSTALL="/home/runner/.fly"
+          export PATH="$FLYCTL_INSTALL/bin:$PATH"
+          
+          EXISTING_IP=$(flyctl ips list --json | jq -r '.[0].address // empty')
+
+          if [ -z "$EXISTING_IP" ]; then
+            echo "🌍 Menambahkan IP publik untuk aplikasi..."
+            flyctl ips allocate-v4
+            flyctl ips allocate-v6
+          else
+            echo "✅ IP sudah ada: $EXISTING_IP"
+          fi
 
       - name: Start Telegram Bot
         run: nohup python3 /app/bot/bot.py & 
@@ -168,5 +170,4 @@ jobs:
         run: |
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
-          
           flyctl ssh console --command "bash /scripts/extend_volume.sh"
