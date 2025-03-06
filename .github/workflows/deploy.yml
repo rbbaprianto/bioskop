@@ -53,6 +53,21 @@ jobs:
           token = {"access_token":"${{ secrets.RCLONE_ACCESS_TOKEN }}","refresh_token":"${{ secrets.RCLONE_REFRESH_TOKEN }}"}
           EOF
 
+      - name: Ensure Fly.io Volume in SIN
+        run: |
+          export FLYCTL_INSTALL="/home/runner/.fly"
+          export PATH="$FLYCTL_INSTALL/bin:$PATH"
+
+          # Cek apakah volume sudah ada
+          EXISTING_VOLUME=$(flyctl volumes list --json | jq -r '.[] | select(.Name=="film_volume") | .ID')
+
+          if [ -z "$EXISTING_VOLUME" ]; then
+            echo "📦 Volume belum ada, membuat baru di region SIN..."
+            flyctl volumes create film_volume --size 10 --region sin
+          else
+            echo "✅ Volume sudah ada: $EXISTING_VOLUME"
+          fi
+
       - name: Deploy to Fly.io
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
