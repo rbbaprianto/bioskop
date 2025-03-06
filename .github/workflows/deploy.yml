@@ -50,6 +50,11 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
+      - name: Authenticate with Fly.io Registry
+        run: |
+    	   echo "${{ secrets.FLY_API_TOKEN }}" | docker login registry.fly.io -u "x" --password-stdin
+
+
       - name: Build & Push Docker Image
         env:
           FLY_APP_NAME: ${{ secrets.FLY_APP_NAME }}
