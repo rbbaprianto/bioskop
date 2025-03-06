@@ -66,6 +66,8 @@ jobs:
         run: |
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
+          
+          #Deploy Aplikasi
           flyctl deploy --remote-only --region sin
 
       - name: Start Telegram Bot
