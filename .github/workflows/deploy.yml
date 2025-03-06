@@ -75,18 +75,20 @@ jobs:
         run: |
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
-          
-          EXISTING_VOLUME=$(flyctl volumes list --json | jq -r '.[] | select(.name=="film_volume") | sort_by(.created_at) | .id' | tail -n1)
 
-          if [ -z "$EXISTING_VOLUME" ]; then
+          echo "🔍 Mencari volume yang tersedia..."
+          EXISTING_VOLUME=$(flyctl volumes list --json | jq -r '[.[] | select(.name=="film_volume")] | sort_by(.created_at) | .[-1].id')
+
+          if [ -z "$EXISTING_VOLUME" ] || [ "$EXISTING_VOLUME" == "null" ]; then
             echo "📦 Volume belum ada, membuat baru di region SIN..."
             NEW_VOLUME=$(flyctl volumes create film_volume --size 5 --region sin --yes | awk '/ID:/ {print $2}')
             echo "VOLUME_ID=$NEW_VOLUME" >> $GITHUB_ENV
-            sleep 10
+            sleep 10  # Tunggu agar volume benar-benar tersedia
           else
-            echo "✅ Volume sudah ada: $EXISTING_VOLUME"
+            echo "✅ Volume ditemukan: $EXISTING_VOLUME"
             echo "VOLUME_ID=$EXISTING_VOLUME" >> $GITHUB_ENV
           fi
+
 
       - name: Deploy App to Fly.io
         env:
@@ -155,11 +157,12 @@ jobs:
           ACTIVE_MACHINES=$(flyctl machines list --app "$FLY_APP_NAME" --json | jq -r '[.[] | select(.state == "started")] | length')
 
           if [ "$ACTIVE_MACHINES" -eq 0 ]; then
-            echo "❌ Tidak ada VM aktif! Menjalankan VM terlebih dahulu..."
-            MACHINE_ID=$(flyctl machines list --app "$FLY_APP_NAME" --json | jq -r '.[0].id')
-            if [ -n "$MACHINE_ID" ] && [ "$MACHINE_ID" != "null" ]; then
-              echo "▶ Menjalankan VM dengan ID: $MACHINE_ID"
-              flyctl machines start "$MACHINE_ID"
+            echo "❌ Tidak ada VM aktif! Mencari VM terbaru..."
+            NEWEST_MACHINE_ID=$(flyctl machines list --app "$FLY_APP_NAME" --json | jq -r 'sort_by(.created_at) | last | .id')
+
+            if [ -n "$NEWEST_MACHINE_ID" ] && [ "$NEWEST_MACHINE_ID" != "null" ]; then
+              echo "▶ Menjalankan VM terbaru dengan ID: $NEWEST_MACHINE_ID"
+              flyctl machines start "$NEWEST_MACHINE_ID"
               sleep 10  # Tunggu 10 detik agar VM siap
             else
               echo "⚠ Tidak ada VM yang ditemukan, pengecekan volume dibatalkan!"
@@ -171,4 +174,5 @@ jobs:
 
           echo "⏳ Menjadwalkan pengecekan volume..."
           flyctl ssh console --command "bash /scripts/extend_volume.sh"
+
 
