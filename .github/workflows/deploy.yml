@@ -76,6 +76,9 @@ jobs:
                -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
                -d "text=✅ Deployment berhasil! Aplikasi telah diperbarui dan berjalan di Fly.io 🚀"
 
+      - name: Wait for Fly.io machine to be ready
+        run: sleep 20  # Tunggu 20 detik sebelum SSH
+
       - name: Schedule Volume Check
         run: |
           source ~/.bashrc
