@@ -52,7 +52,6 @@ jobs:
           scope = drive
           token = {"access_token":"${{ secrets.RCLONE_ACCESS_TOKEN }}","refresh_token":"${{ secrets.RCLONE_REFRESH_TOKEN }}"}
           EOF
-
       - name: Ensure Fly.io Volume in SIN
         run: |
           export FLYCTL_INSTALL="/home/runner/.fly"
@@ -68,14 +67,7 @@ jobs:
             echo "✅ Volume sudah ada: $EXISTING_VOLUME"
           fi
           
-          # Pastikan volume terhubung ke mesin yang benar
-          MACHINE_ID=$(flyctl machines list --json | jq -r '.[0].id')
-          if [ -n "$MACHINE_ID" ]; then
-            echo "🔄 Menghubungkan volume ke mesin: $MACHINE_ID"
-            flyctl machines update $MACHINE_ID --attach-volume $EXISTING_VOLUME:/film
-          fi
-
-      - name: Deploy to Fly.io
+      - name: Deploy Fly.io App
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -88,6 +80,22 @@ jobs:
         run: |
           source ~/.bashrc
           /home/runner/.fly/bin/flyctl deploy --remote-only
+
+      - name: Attach Volume to Machine
+        run: |
+          source ~/.bashrc
+          
+          # Ambil Machine ID setelah deploy
+          MACHINE_ID=$(flyctl machines list --json | jq -r '.[0].id')
+
+          if [ -n "$MACHINE_ID" ]; then
+            echo "🔄 Menghubungkan volume ke mesin: $MACHINE_ID"
+            flyctl machines update $MACHINE_ID --mount-point /film
+          else
+            echo "❌ Tidak ada mesin yang tersedia untuk attach volume!"
+            exit 1
+          fi
+
 
       - name: Start Telegram Bot
         run: nohup python3 /app/bot/bot.py & 
