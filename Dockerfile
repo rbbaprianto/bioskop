@@ -1,14 +1,8 @@
-# Gunakan image Python sebagai base
-FROM python:3.9
+FROM python:3.9-slim
 
-# Install dependencies bot
-WORKDIR /app/bot
-COPY scripts/bot.py /app/bot/bot.py
-RUN pip3 install python-telegram-bot
+WORKDIR /app
+COPY . /app
 
-# Jalankan bot sebagai entrypoint
-CMD ["python3", "/app/bot/bot.py"]
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Salin extend_volume.sh ke dalam container
-COPY scripts/extend_volume.sh /scripts/extend_volume.sh
-RUN chmod +x /scripts/extend_volume.sh
+CMD ["python3", "/app/bot.py"]
