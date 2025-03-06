@@ -1,5 +1,4 @@
 # flyctl launch added from .gitignore
-config
 film
 **/__pycache__
 **/*.log
