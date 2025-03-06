@@ -89,6 +89,8 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
           set -e
+          export FLYCTL_INSTALL="/home/runner/.fly"
+          export PATH="$FLYCTL_INSTALL/bin:$PATH"
           export FLY_ACCESS_TOKEN="${{ secrets.FLY_API_TOKEN }}"
           flyctl auth whoami || flyctl auth login --access-token "${{ secrets.FLY_API_TOKEN }}"
 
@@ -96,6 +98,8 @@ jobs:
         id: check-volume
         run: |
           set -e
+          export FLYCTL_INSTALL="/home/runner/.fly"
+          export PATH="$FLYCTL_INSTALL/bin:$PATH"
           EXISTING_VOLUME=$(flyctl volumes list --json | jq -r '.[] | select(.name=="film_volume") | sort_by(.created_at) | last | .id')
           if [ -z "$EXISTING_VOLUME" ]; then
             echo "📦 Volume belum ada, membuat baru di region SIN..."
@@ -114,12 +118,16 @@ jobs:
           VOLUME_ID: ${{ env.VOLUME_ID }}
         run: |
           set -e
+          export FLYCTL_INSTALL="/home/runner/.fly"
+          export PATH="$FLYCTL_INSTALL/bin:$PATH"
           echo "🚀 Deploying to Fly.io..."
           flyctl deploy --remote-only --strategy immediate --regions sin
 
       - name: Restart Fly.io App
         run: |
           set -e
+          export FLYCTL_INSTALL="/home/runner/.fly"
+          export PATH="$FLYCTL_INSTALL/bin:$PATH"
           echo "🔄 Restarting Fly.io App"
           MACHINE_ID=$(flyctl machines list --json | jq -r '.[0].id')
           if [ -n "$MACHINE_ID" ]; then
