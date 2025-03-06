@@ -70,7 +70,8 @@ jobs:
           RCLONE_REFRESH_TOKEN: ${{ secrets.RCLONE_REFRESH_TOKEN }}
           FLY_ACCESS_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
-          source ~/.bashrc
+          export FLYCTL_INSTALL="/home/runner/.fly"
+          export PATH="$FLYCTL_INSTALL/bin:$PATH"
 
           # Cek apakah aplikasi sudah ada
           APP_EXISTS=$(flyctl apps list --json | jq -r --arg APP "$FLY_APP_NAME" '.[] | select(.Name==$APP) | .Name')
