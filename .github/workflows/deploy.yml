@@ -1,12 +1,22 @@
 name: Deploy to Fly.io
-
 on:
   push:
     branches:
       - main
 
 jobs:
-  deploy:
+  cleanup-old-workflows:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete old workflow runs
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          retain_days: 0
+          keep_minimum_runs: 0
+
+  install-dependencies:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -20,83 +30,88 @@ jobs:
           echo 'export FLYCTL_INSTALL="/home/runner/.fly"' >> ~/.bashrc
           echo 'export PATH="$FLYCTL_INSTALL/bin:$PATH"' >> ~/.bashrc
           source ~/.bashrc
+          
+          curl https://rclone.org/install.sh | sudo bash
           sudo apt-get update && sudo apt-get install -y jq gh
 
       - name: Authenticate Fly.io
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
+          export FLYCTL_INSTALL="/home/runner/.fly"
+          export PATH="$FLYCTL_INSTALL/bin:$PATH"
           flyctl auth whoami || flyctl auth login --access-token "${{ secrets.FLY_API_TOKEN }}"
 
-      - name: Clean Up Unused Volumes
-        run: |
-          export FLYCTL_INSTALL="/home/runner/.fly"
-          export PATH="$FLYCTL_INSTALL/bin:$PATH"
-          flyctl volumes list --json | jq -r '.[] | select(.attached_machine_id == null) | .id' | while read vol; do
-            if [ ! -z "$vol" ]; then
-              echo "🗑️  Menghapus volume: $vol"
-              flyctl volumes delete $vol --yes
-            fi
-          done
-
-      - name: Set Secrets in Fly.io
-        env:
-          FLY_APP_NAME: ${{ secrets.FLY_APP_NAME }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          export FLYCTL_INSTALL="/home/runner/.fly"
-          export PATH="$FLYCTL_INSTALL/bin:$PATH"
-          flyctl secrets set TELEGRAM_BOT_TOKEN="$TELEGRAM_BOT_TOKEN" TELEGRAM_CHAT_ID="$TELEGRAM_CHAT_ID"
-
-
-      - name: Ensure Volume Exists
-        run: |
-          export FLYCTL_INSTALL="/home/runner/.fly"
-          export PATH="$FLYCTL_INSTALL/bin:$PATH"
-          
-          EXISTING_VOLUME=$(flyctl volumes list --json | jq -r '.[] | select(.name=="film_volume") | sort_by(.created_at) | last | .id')
-          if [ -z "$EXISTING_VOLUME" ]; then
-            echo "📦 Volume belum ada, membuat baru di region SIN..."
-            NEW_VOLUME=$(flyctl volumes create film_volume --size 5 --region sin --yes | awk '/ID:/ {print $2}')
-            echo "VOLUME_ID=$NEW_VOLUME" >> $GITHUB_ENV
-          else
-            echo "✅ Volume sudah ada: $EXISTING_VOLUME"
-            echo "VOLUME_ID=$EXISTING_VOLUME" >> $GITHUB_ENV
-          fi
+  compose-application:
+    runs-on: ubuntu-latest
+    needs: install-dependencies
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
 
       - name: Build & Push Docker Image
         env:
           FLY_APP_NAME: ${{ secrets.FLY_APP_NAME }}
         run: |
+          export FLYCTL_INSTALL="/home/runner/.fly"
+          export PATH="$FLYCTL_INSTALL/bin:$PATH"
+          
+          echo "🔄 Pushing image to Fly.io registry..."
           docker build -t registry.fly.io/$FLY_APP_NAME:latest .
           docker push registry.fly.io/$FLY_APP_NAME:latest
 
-      - name: Deploy or Update Machine
+      - name: Ensure Volume Exists
+        id: check-volume
+        run: |
+          export FLYCTL_INSTALL="/home/runner/.fly"
+          export PATH="$FLYCTL_INSTALL/bin:$PATH"
+          EXISTING_VOLUME=$(flyctl volumes list --json | jq -r '.[] | select(.name=="film_volume") | sort_by(.created_at) | last | .id')
+          if [ -z "$EXISTING_VOLUME" ]; then
+            echo "📦 Volume belum ada, membuat baru di region SIN..."
+            NEW_VOLUME=$(flyctl volumes create film_volume --size 5 --region sin --yes | awk '/ID:/ {print $2}')
+            echo "VOLUME_ID=$NEW_VOLUME" >> $GITHUB_ENV
+            sleep 10  # Tunggu agar volume benar-benar tersedia
+          else
+            echo "✅ Volume sudah ada: $EXISTING_VOLUME"
+            echo "VOLUME_ID=$EXISTING_VOLUME" >> $GITHUB_ENV
+          fi
+
+  deploy-application:
+    runs-on: ubuntu-latest
+    needs: compose-application
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Deploy Application
         env:
           FLY_APP_NAME: ${{ secrets.FLY_APP_NAME }}
           VOLUME_ID: ${{ env.VOLUME_ID }}
         run: |
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
-          
-          EXISTING_MACHINE=$(flyctl machines list --json | jq -r '.[0].id')
-          if [ -n "$EXISTING_MACHINE" ]; then
-            echo "🔄 Mesin sudah ada, melakukan update..."
-            flyctl deploy --remote-only --strategy immediate --regions sin
-          else
-            echo "🚀 Membuat mesin baru di SIN..."
-            flyctl machine run registry.fly.io/$FLY_APP_NAME:latest \
-              --app $FLY_APP_NAME \
-              --region sin \
-              --volume "$VOLUME_ID:/film" \
-              --metadata fly_platform=machines \
-              --vm-size shared-cpu-1x \
-              --restart always
-          fi
+          echo "🚀 Deploying to Fly.io..."
+          flyctl deploy --remote-only --strategy immediate --regions sin
 
+      - name: Restart Application
+        run: |
+          export FLYCTL_INSTALL="/home/runner/.fly"
+          export PATH="$FLYCTL_INSTALL/bin:$PATH"
+          echo "🔄 Restarting Fly.io App"
+          flyctl machines restart --app $FLY_APP_NAME
+
+  finish-deployment:
+    runs-on: ubuntu-latest
+    needs: deploy-application
+    steps:
       - name: Send Telegram Notification
         run: |
           curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
                -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
                -d "text=✅ Deployment sukses! Aplikasi telah diperbarui dan berjalan di Fly.io 🚀"
+
+      - name: Schedule Volume Check
+        run: |
+          export FLYCTL_INSTALL="/home/runner/.fly"
+          export PATH="$FLYCTL_INSTALL/bin:$PATH"
+          flyctl ssh console --command "bash /scripts/extend_volume.sh"
