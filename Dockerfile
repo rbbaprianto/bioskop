@@ -1,13 +1,19 @@
-FROM python:3.9-slim
+# Gunakan Python sebagai base image
+FROM python:3.9
 
-# Mengatur direktori kerja dalam container
+# Set working directory dalam container
 WORKDIR /app
 
-# Salin semua file yang diperlukan, termasuk bot.py
-COPY . /app/
+# Salin hanya folder scripts ke dalam container
+COPY scripts /app/scripts/
 
-# Pastikan bot.py memiliki izin eksekusi
-RUN chmod +x /app/bot.py
+# Buat virtual environment (venv), aktifkan, dan instal dependensi
+RUN python3 -m venv /app/venv && \
+    /app/venv/bin/pip install --upgrade pip && \
+    if [ -f "/app/scripts/requirements.txt" ]; then /app/venv/bin/pip install --no-cache-dir -r /app/scripts/requirements.txt; fi
 
-# Menjalankan bot
-CMD ["python3", "/app/bot.py"]
+# Pastikan semua script memiliki izin eksekusi
+RUN chmod +x /app/scripts/*.sh /app/scripts/bot.py
+
+# Gunakan venv untuk menjalankan bot.py
+CMD ["/app/venv/bin/python3", "/app/scripts/bot.py"]
