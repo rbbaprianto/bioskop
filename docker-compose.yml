@@ -1,104 +1,68 @@
 version: '3.8'
 
 services:
-  jellyfin:
+  bioskop-jellyfin:
     image: jellyfin/jellyfin
-    container_name: jellyfin
+    container_name: bioskop-jellyfin
     volumes:
-      - film_volume:/film
       - ./config/jellyfin:/config
+      - /film:/film
     ports:
       - "8096:8096"
 
-  aria2:
+  bioskop-aria2:
     image: p3terx/aria2-pro
-    container_name: aria2
+    container_name: bioskop-aria2
     volumes:
-      - film_volume:/film
       - ./config/aria2:/config
-    environment:
-      - RPC_SECRET=${RPC_SECRET} #Ambil dari github secrets
+      - /film:/film
     ports:
       - "6800:6800"
 
-  rclone:
-    image: rclone/rclone
-    container_name: rclone
+  bioskop-qbittorrent:
+    image: linuxserver/qbittorrent
+    container_name: bioskop-qbittorrent
     volumes:
-      - film_volume:/film
-      - ./config/rclone:/config
-    command: sync remote:path /film --config /config/rclone.conf
+      - ./config/qbittorrent:/config
+      - /film:/downloads
+    ports:
+      - "6881:6881"
+      - "6881:6881/udp"
 
-  kuma:
+  bioskop-uptime-kuma:
     image: louislam/uptime-kuma
-    container_name: uptime-kuma
+    container_name: bioskop-uptime-kuma
     volumes:
       - ./config/kuma:/app/data
     ports:
       - "3001:3001"
 
-  bot:
-    build: .
-    container_name: telegram-bot
-    volumes:
-      - ./config:/config
-    environment:
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN} #mbil dari github secrets
-      - FLY_API_TOKEN=${FLY_API_TOKEN}
-    command: python3 /app/bot/bot.py
-
-  qbittorrent:
-    image: lscr.io/linuxserver/qbittorrent
-    container_name: qbittorrent
-    ports:
-      - "8080:8080"
-    volumes:
-      - film_volume:/film
-      - ./config/qbittorrent:/config
-    environment:
-      - WEBUI_PORT=8080
-      - PUID=1000
-      - PGID=1000
-    restart: unless-stopped
-
-  filebrowser:
+  bioskop-filebrowser:
     image: filebrowser/filebrowser
-    container_name: filebrowser
+    container_name: bioskop-filebrowser
     volumes:
-      - film_volume:/srv
-      - ./config/filebrowser:/config
+      - /film:/srv
     ports:
-      - "8081:80"
-    restart: unless-stopped
+      - "8080:80"
 
-  prowlarr:
-    image: lscr.io/linuxserver/prowlarr
-    container_name: prowlarr
+  bioskop-prowlarr:
+    image: linuxserver/prowlarr
+    container_name: bioskop-prowlarr
     volumes:
       - ./config/prowlarr:/config
     ports:
       - "9696:9696"
-    restart: unless-stopped
 
-  organizr:
+  bioskop-organizr:
     image: organizr/organizr
-    container_name: organizr
+    container_name: bioskop-organizr
     volumes:
       - ./config/organizr:/config
     ports:
-      - "8888:80"
-    restart: unless-stopped
+      - "80:80"
 
-  netdata:
+  bioskop-netdata:
     image: netdata/netdata
-    container_name: netdata
+    container_name: bioskop-netdata
     ports:
       - "19999:19999"
-    volumes:
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    restart: unless-stopped
-
-volumes:
-  film_volume:
