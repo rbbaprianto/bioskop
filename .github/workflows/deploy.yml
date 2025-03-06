@@ -68,7 +68,7 @@ jobs:
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
           
           #Deploy Aplikasi
-          flyctl deploy --remote-only --region sin
+          flyctl deploy --remote-only --regions sin
 
       - name: Start Telegram Bot
         run: nohup python3 /app/bot/bot.py & 
