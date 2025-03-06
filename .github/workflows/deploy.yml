@@ -49,9 +49,9 @@ jobs:
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
 
-          echo "🗑️  Menghapus volume yang tidak terpakai..."
+          echo "🗑️ Menghapus volume yang tidak terpakai..."
           flyctl volumes list --json | jq -r '.[] | select(.AttachedMachine == null) | .ID' | while read vol; do
-            echo "🗑️  Menghapus volume: $vol"
+            echo "🗑️ Menghapus volume: $vol"
             flyctl volumes delete $vol --yes
           done
 
@@ -61,10 +61,10 @@ jobs:
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
 
-          EXISTING_VOLUME=$(flyctl volumes list --json | jq -r '.[] | select(.Name=="film_volume" and .AttachedMachine != null) | .ID')
+          EXISTING_VOLUME=$(flyctl volumes list --json | jq -r '.[] | select(.Name=="film_volume") | .ID')
 
           if [ -z "$EXISTING_VOLUME" ]; then
-            echo "📦 Volume belum ada atau belum terpasang, membuat baru di region SIN..."
+            echo "📦 Volume belum ada, membuat baru di region SIN..."
             NEW_VOLUME=$(flyctl volumes create film_volume --size 10 --region sin --yes | awk '/ID:/ {print $2}')
             echo "VOLUME_ID=$NEW_VOLUME" >> $GITHUB_ENV
           else
@@ -78,7 +78,7 @@ jobs:
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
 
-          EXISTING_MACHINE=$(flyctl machines list --json | jq -r '.[0].id')
+          EXISTING_MACHINE=$(flyctl machines list --json | jq -r '.[] | select(.state == "started") | .id')
 
           if [ -n "$EXISTING_MACHINE" ]; then
             echo "✅ Mesin ditemukan: $EXISTING_MACHINE"
@@ -111,7 +111,8 @@ jobs:
             flyctl machine run registry.fly.io/$FLY_APP_NAME:latest \
               --name $FLY_APP_NAME \
               --region sin \
-              --volume $VOLUME_ID:/film
+              --volume $VOLUME_ID:/film \
+              --yes
           fi
 
       - name: Restart App After Update
@@ -137,5 +138,7 @@ jobs:
 
       - name: Schedule Volume Check
         run: |
-          source ~/.bashrc
-          /home/runner/.fly/bin/flyctl ssh console --command "bash /scripts/extend_volume.sh"
+          export FLYCTL_INSTALL="/home/runner/.fly"
+          export PATH="$FLYCTL_INSTALL/bin:$PATH"
+          
+          flyctl ssh console --command "bash /scripts/extend_volume.sh"
