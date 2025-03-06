@@ -137,7 +137,7 @@ jobs:
 
           if [ -z "$EXISTING_VOLUME" ] || [ "$EXISTING_VOLUME" = "null" ]; then
             echo "📦 Volume belum ada, membuat baru di region SIN..."
-            NEW_VOLUME=$(flyctl volumes create film_volume --size 5 --region sin --yes | awk '/ID:/ {print $2}')
+            NEW_VOLUME=$(flyctl volumes create film_volume --size 5 --region sin --app "$FLY_APP_NAME" --yes | awk '/ID:/ {print $2}')
             echo "VOLUME_ID=$NEW_VOLUME" >> $GITHUB_ENV
             sleep 10
           else
@@ -149,18 +149,10 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
           FLY_APP_NAME: ${{ secrets.FLY_APP_NAME }}
-          VOLUME_ID: ${{ env.VOLUME_ID }}
         run: |
           set -e
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
-          
-          MACHINE_ID=$(flyctl machines list --json | jq -r '.[0].id')
-
-          if [ -z "$MACHINE_ID" ] || [ "$MACHINE_ID" = "null" ]; then
-            echo "❌ ERROR: Tidak ada Machine ID yang ditemukan! Pastikan aplikasi telah berjalan sebelumnya."
-            exit 1
-          fi
 
           if [ -z "$FLY_APP_NAME" ]; then
             echo "❌ ERROR: FLY_APP_NAME tidak ditemukan. Pastikan sudah diatur di GitHub Secrets!"
@@ -168,8 +160,16 @@ jobs:
           fi
 
           echo "🚀 Deploying to Fly.io..."
-          flyctl deploy --remote-only --strategy immediate --regions sin -a "$FLY_APP_NAME" --build-only
-          
+          flyctl deploy --remote-only --strategy immediate --regions sin --app "$FLY_APP_NAME"
+
+          echo "🔄 Menjalankan update mesin..."
+          MACHINE_ID=$(flyctl machines list --app "$FLY_APP_NAME" --json | jq -r '.[0].id')
+
+          if [ -z "$MACHINE_ID" ] || [ "$MACHINE_ID" = "null" ]; then
+            echo "❌ ERROR: Tidak ada Machine ID yang ditemukan! Pastikan aplikasi telah berjalan sebelumnya."
+            exit 1
+          fi
+
           echo "🔄 Updating Machine ID: $MACHINE_ID"
           flyctl machines update "$MACHINE_ID" --app "$FLY_APP_NAME" --image "registry.fly.io/$FLY_APP_NAME:latest"
 
