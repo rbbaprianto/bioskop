@@ -1,4 +1,16 @@
-python-telegram-bot==20.0
+# Bot Telegram & HTTP Requests
+python-telegram-bot==20.8
 requests==2.31.0
+
+# JSON & YAML Parsing
+pyyaml==6.0
+json5==0.9.14
+
+# Logging
+loguru==0.7.2
+
+# Async & Scheduling
+apscheduler==3.10.1
+
 rclone
 
