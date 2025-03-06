@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - main
+
 jobs:
   cleanup-old-workflows:
     runs-on: ubuntu-latest
@@ -12,8 +13,8 @@ jobs:
         with:
           token: ${{ secrets.HAPUS_REPO_TOKEN }}
           repository: ${{ github.repository }}
-          retain_days: 0  # Hapus langsung
-          keep_minimum_runs: 1  # Simpan hanya 1 workflow terakhir
+          retain_days: 0
+          keep_minimum_runs: 1
 
   deploy:
     runs-on: ubuntu-latest
@@ -43,34 +44,50 @@ jobs:
           echo "FLY_ACCESS_TOKEN=${{ secrets.FLY_API_TOKEN }}" >> $GITHUB_ENV
           flyctl auth whoami || flyctl auth login --access-token "${{ secrets.FLY_API_TOKEN }}"
 
-      - name: Use Rclone Tokens from Secrets
+      - name: Ensure Volume Exists (or Attach Existing)
         run: |
-          mkdir -p ~/.config/rclone
-          cat <<EOF > ~/.config/rclone/rclone.conf
-          [gdrive]
-          type = drive
-          scope = drive
-          token = {"access_token":"${{ secrets.RCLONE_ACCESS_TOKEN }}","refresh_token":"${{ secrets.RCLONE_REFRESH_TOKEN }}"}
-          EOF
-          
-      - name: Deploy Fly.io App
+          export FLYCTL_INSTALL="/home/runner/.fly"
+          export PATH="$FLYCTL_INSTALL/bin:$PATH"
+
+          # Cek apakah volume sudah ada
+          EXISTING_VOLUME=$(flyctl volumes list --json | jq -r '.[] | select(.Name=="film_volume") | .ID')
+
+          if [ -z "$EXISTING_VOLUME" ]; then
+            echo "📦 Volume belum ada, membuat baru di region SIN..."
+            flyctl volumes create film_volume --size 10 --region sin --yes
+            sleep 5
+          else
+            echo "✅ Volume sudah ada: $EXISTING_VOLUME"
+          fi
+
+      - name: Deploy or Update App
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           FLY_APP_NAME: ${{ secrets.FLY_APP_NAME }}
-          FLY_VOLUME_ID: ${{ secrets.FLY_VOLUME_ID }}
           RPC_SECRET: ${{ secrets.RPC_SECRET }}
           RCLONE_ACCESS_TOKEN: ${{ secrets.RCLONE_ACCESS_TOKEN }}
           RCLONE_REFRESH_TOKEN: ${{ secrets.RCLONE_REFRESH_TOKEN }}
           FLY_ACCESS_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
-          export FLYCTL_INSTALL="/home/runner/.fly"
-          export PATH="$FLYCTL_INSTALL/bin:$PATH"
-          
-          flyctl secrets set TELEGRAM_BOT_TOKEN="${{ secrets.TELEGRAM_BOT_TOKEN }}" TELEGRAM_CHAT_ID="${{ secrets.TELEGRAM_CHAT_ID }}"
-          
-          #Deploy Aplikasi
-          flyctl deploy --remote-only --regions sin
+          source ~/.bashrc
+
+          # Cek apakah aplikasi sudah ada
+          APP_EXISTS=$(flyctl apps list --json | jq -r --arg APP "$FLY_APP_NAME" '.[] | select(.Name==$APP) | .Name')
+
+          if [ -z "$APP_EXISTS" ]; then
+            echo "🚀 Aplikasi belum ada, melakukan deploy pertama kali..."
+            flyctl deploy --remote-only --region sin
+          else
+            echo "🔄 Aplikasi sudah ada, melakukan update..."
+            flyctl deploy --remote-only --region sin --strategy immediate
+          fi
+
+      - name: Restart App After Update
+        run: |
+          source ~/.bashrc
+          echo "🔄 Restarting Fly.io App"
+          flyctl machines restart --app $FLY_APP_NAME
 
       - name: Start Telegram Bot
         run: nohup python3 /app/bot/bot.py & 
@@ -79,7 +96,7 @@ jobs:
         run: |
           curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
                -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
-               -d "text=✅ Deployment berhasil! Aplikasi telah diperbarui dan berjalan di Fly.io 🚀"
+               -d "text=✅ Deployment sukses! Aplikasi telah diperbarui dan berjalan di Fly.io 🚀"
 
       - name: Wait for Fly.io machine to be ready
         run: sleep 20  # Tunggu 20 detik sebelum SSH
