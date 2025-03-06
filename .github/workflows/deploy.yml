@@ -63,7 +63,7 @@ jobs:
 
           if [ -z "$EXISTING_VOLUME" ]; then
             echo "📦 Volume belum ada, membuat baru di region SIN..."
-            flyctl volumes create film_volume --size 10 --region sin
+            flyctl volumes create film_volume --size 10 --region sin --yes
           else
             echo "✅ Volume sudah ada: $EXISTING_VOLUME"
           fi
