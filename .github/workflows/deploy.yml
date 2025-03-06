@@ -86,6 +86,7 @@ jobs:
           else
             echo "✅ Flyctl already installed."
           fi
+          
       - name: Authenticate Fly.io
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
@@ -150,22 +151,22 @@ jobs:
           
           MACHINE_ID=$(flyctl machines list --json | jq -r '.[0].id')
 
-	  if [ -z "$MACHINE_ID" ] || [ "$MACHINE_ID" = "null" ]; then
-	    echo "❌ ERROR: Tidak ada Machine ID yang ditemukan! Pastikan aplikasi telah berjalan sebelumnya."
-	    exit 1
-	  fi
+          if [ -z "$MACHINE_ID" ] || [ "$MACHINE_ID" = "null" ]; then
+            echo "❌ ERROR: Tidak ada Machine ID yang ditemukan! Pastikan aplikasi telah berjalan sebelumnya."
+            exit 1
+          fi
 
           if [ -z "$FLY_APP_NAME" ]; then
             echo "❌ ERROR: FLY_APP_NAME tidak ditemukan. Pastikan sudah diatur di GitHub Secrets!"
-          exit 1
+            exit 1
           fi
 
           echo "🚀 Deploying to Fly.io..."
           flyctl deploy --remote-only --strategy immediate --regions sin -a "$FLY_APP_NAME" --build-only
           
           echo "🔄 Updating Machine ID: $MACHINE_ID"
-	  flyctl machines update "$MACHINE_ID" --app "$FLY_APP_NAME" --image "registry.fly.io/$FLY_APP_NAME:latest"
-          #flyctl machines update --app "$FLY_APP_NAME" --image "registry.fly.io/$FLY_APP_NAME:latest"
+          flyctl machines update "$MACHINE_ID" --app "$FLY_APP_NAME" --image "registry.fly.io/$FLY_APP_NAME:latest"
+
 
       - name: Restart Fly.io App
         run: |
