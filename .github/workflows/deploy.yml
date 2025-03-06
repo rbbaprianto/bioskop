@@ -106,14 +106,23 @@ jobs:
         run: |
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
-          
-          if [ -n "$FLY_APP_NAME" ]; then
-            echo "🔄 Restarting Fly.io App: $FLY_APP_NAME"
-            flyctl machines restart --app "$FLY_APP_NAME"
-          else
+
+          if [ -z "$FLY_APP_NAME" ]; then
             echo "❌ FLY_APP_NAME tidak ditemukan!"
             exit 1
           fi
+
+          echo "🔍 Mencari Machine ID untuk aplikasi $FLY_APP_NAME..."
+          MACHINE_ID=$(flyctl machines list --app "$FLY_APP_NAME" --json | jq -r '.[0].id')
+
+          if [ -z "$MACHINE_ID" ] || [ "$MACHINE_ID" == "null" ]; then
+            echo "❌ Tidak ada mesin yang ditemukan untuk aplikasi ini!"
+            exit 1
+          fi
+
+          echo "🔄 Restarting Fly.io App dengan Machine ID: $MACHINE_ID"
+          flyctl machines restart "$MACHINE_ID"
+
 
       - name: Send Telegram Notification
         env:
