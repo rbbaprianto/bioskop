@@ -15,11 +15,6 @@ RUN apt-get update && apt-get install -y \
     npm && \
     apt-get clean
 
-# Install Jellyfin
-RUN curl -fsSL https://repo.jellyfin.org/jellyfin_team.gpg.key | tee /usr/share/keyrings/jellyfin.gpg > /dev/null && \
-    echo "deb [signed-by=/usr/share/keyrings/jellyfin.gpg] https://repo.jellyfin.org/debian bookworm main" | tee /etc/apt/sources.list.d/jellyfin.list && \
-    apt-get update && apt-get install -y jellyfin && \
-    apt-get clean
 
 # Install Filebrowser
 RUN curl -fsSL https://raw.githubusercontent.com/filebrowser/get/master/get.sh | bash
