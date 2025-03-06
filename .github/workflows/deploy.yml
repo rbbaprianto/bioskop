@@ -121,12 +121,17 @@ jobs:
             flyctl deploy --remote-only --strategy immediate --regions sin
           else
             echo "🚀 Membuat mesin baru di SIN..."
+            sleep 5  # Tunggu agar volume tersedia
+
             flyctl machine run registry.fly.io/$FLY_APP_NAME:latest \
-              --name $FLY_APP_NAME \
+              --app $FLY_APP_NAME \
               --region sin \
-              --volume $VOLUME_ID:/film \
-              --yes
+              --volume "$VOLUME_ID:/film" \
+              --metadata fly_platform=machines \
+              --vm-size shared-cpu-1x \
+              --restart always
           fi
+
 
       - name: Restart App After Update
         if: env.MACHINE_ID != ''
