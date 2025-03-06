@@ -44,19 +44,29 @@ jobs:
           echo "FLY_ACCESS_TOKEN=${{ secrets.FLY_API_TOKEN }}" >> $GITHUB_ENV
           flyctl auth whoami || flyctl auth login --access-token "${{ secrets.FLY_API_TOKEN }}"
 
+      - name: Clean Up Unused Volumes
+        run: |
+          export FLYCTL_INSTALL="/home/runner/.fly"
+          export PATH="$FLYCTL_INSTALL/bin:$PATH"
+
+          echo "🗑️  Menghapus volume yang tidak terpakai..."
+          flyctl volumes list --json | jq -r '.[] | select(.AttachedMachine == null) | .ID' | while read vol; do
+            echo "🗑️  Menghapus volume: $vol"
+            flyctl volumes delete $vol --yes
+          done
+
       - name: Ensure Volume Exists
         id: check_volume
         run: |
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
 
-          # Cek apakah volume sudah ada
-          EXISTING_VOLUME=$(flyctl volumes list --json | jq -r '.[] | select(.Name=="film_volume") | .ID')
+          EXISTING_VOLUME=$(flyctl volumes list --json | jq -r '.[] | select(.Name=="film_volume" and .AttachedMachine != null) | .ID')
 
           if [ -z "$EXISTING_VOLUME" ]; then
-            echo "📦 Volume belum ada, membuat baru di region SIN..."
-            flyctl volumes create film_volume --size 10 --region sin --yes
-            sleep 5
+            echo "📦 Volume belum ada atau belum terpasang, membuat baru di region SIN..."
+            NEW_VOLUME=$(flyctl volumes create film_volume --size 10 --region sin --yes | awk '/ID:/ {print $2}')
+            echo "VOLUME_ID=$NEW_VOLUME" >> $GITHUB_ENV
           else
             echo "✅ Volume sudah ada: $EXISTING_VOLUME"
             echo "VOLUME_ID=$EXISTING_VOLUME" >> $GITHUB_ENV
@@ -68,7 +78,6 @@ jobs:
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
 
-          # Cek apakah ada mesin yang aktif
           EXISTING_MACHINE=$(flyctl machines list --json | jq -r '.[0].id')
 
           if [ -n "$EXISTING_MACHINE" ]; then
