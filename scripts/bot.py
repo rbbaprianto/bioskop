@@ -1,4 +1,5 @@
 import os
+import time
 import subprocess
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, CallbackContext
@@ -7,12 +8,13 @@ TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 FLY_APP_NAME = os.environ["FLY_APP_NAME"]
 FLY_VOLUME_ID = os.environ["FLY_VOLUME_ID"]
+FLYCTL_PATH = "/home/runner/.fly/bin/flyctl"
 
 def check_vm_status(update: Update, context: CallbackContext):
     update.message.reply_text("⏳ Mengecek status VM...")
     try:
         result = subprocess.run(
-            ["flyctl", "status", "--app", FLY_APP_NAME],
+            [FLYCTL_PATH, "status", "--app", FLY_APP_NAME],
             capture_output=True, text=True
         )
         update.message.reply_text(f"📡 Status VM:\n\n{result.stdout}")
@@ -23,7 +25,7 @@ def start_vm(update: Update, context: CallbackContext):
     update.message.reply_text("⚡ Menyalakan VM...")
     try:
         result = subprocess.run(
-            ["flyctl", "machines", "start", "--app", FLY_APP_NAME],
+            [FLYCTL_PATH, "machines", "start", "--app", FLY_APP_NAME],
             capture_output=True, text=True
         )
         update.message.reply_text(f"✅ VM berhasil dinyalakan.\n\n{result.stdout}")
@@ -34,7 +36,7 @@ def stop_vm(update: Update, context: CallbackContext):
     update.message.reply_text("🛑 Mematikan VM...")
     try:
         result = subprocess.run(
-            ["flyctl", "machines", "stop", "--app", FLY_APP_NAME],
+            [FLYCTL_PATH, "machines", "stop", "--app", FLY_APP_NAME],
             capture_output=True, text=True
         )
         update.message.reply_text(f"✅ VM berhasil dimatikan.\n\n{result.stdout}")
@@ -45,7 +47,7 @@ def extend_yes(update: Update, context: CallbackContext):
     update.message.reply_text("📢 Memperbesar volume sebesar 10GB...")
     try:
         result = subprocess.run(
-            ["flyctl", "volumes", "extend", FLY_VOLUME_ID, "--size=+10"],
+            [FLYCTL_PATH, "volumes", "extend", FLY_VOLUME_ID, "--size=+10"],
             capture_output=True, text=True
         )
         update.message.reply_text(f"✅ Volume diperbesar 10GB.\n\nOutput:\n{result.stdout}")
@@ -69,4 +71,5 @@ def main():
     updater.idle()
 
 if __name__ == "__main__":
+    time.sleep(10)  # Tunggu 10 detik sebelum bot mulai
     main()

@@ -2,6 +2,9 @@ app = "bioskop"
 kill_signal = "SIGINT"
 kill_timeout = 5
 
+[build]
+  region = "sin"
+
 [env]
   TELEGRAM_BOT_TOKEN = "${{ secrets.TELEGRAM_BOT_TOKEN }}"
   RPC_SECRET = "${{ secrets.RPC_SECRET }}"
