@@ -77,6 +77,7 @@ jobs:
 
       - name: Deploy Application
         env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
           FLY_APP_NAME: ${{ secrets.FLY_APP_NAME }}
           VOLUME_ID: ${{ env.VOLUME_ID }}
         run: |
