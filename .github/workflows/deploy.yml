@@ -27,6 +27,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
+          set -e
           curl -L https://fly.io/install.sh | sh
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
@@ -49,7 +50,7 @@ jobs:
         run: |
           echo "${{ secrets.FLY_API_TOKEN }}" | docker login registry.fly.io -u "x" --password-stdin
           
-      - name: Debugging: Check File in Image
+      - name: Debugging - Check File in Image
         run: |
           docker build -t test-image .
           docker run --rm test-image ls -lah /app/
@@ -58,6 +59,7 @@ jobs:
         env:
           FLY_APP_NAME: ${{ secrets.FLY_APP_NAME }}
         run: |
+          set -e
           docker build -t registry.fly.io/$FLY_APP_NAME:latest .
           docker push registry.fly.io/$FLY_APP_NAME:latest
 
@@ -68,6 +70,7 @@ jobs:
     steps:
       - name: Install Flyctl
         run: |
+          set -e
           curl -L https://fly.io/install.sh | sh
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
@@ -79,12 +82,14 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
+          set -e
           export FLY_ACCESS_TOKEN="${{ secrets.FLY_API_TOKEN }}"
           flyctl auth whoami || flyctl auth login --access-token "${{ secrets.FLY_API_TOKEN }}"
 
       - name: Ensure Volume Exists
         id: check-volume
         run: |
+          set -e
           EXISTING_VOLUME=$(flyctl volumes list --json | jq -r '.[] | select(.name=="film_volume") | sort_by(.created_at) | last | .id')
           if [ -z "$EXISTING_VOLUME" ]; then
             echo "📦 Volume belum ada, membuat baru di region SIN..."
@@ -98,14 +103,17 @@ jobs:
 
       - name: Deploy App to Fly.io
         env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
           FLY_APP_NAME: ${{ secrets.FLY_APP_NAME }}
           VOLUME_ID: ${{ env.VOLUME_ID }}
         run: |
+          set -e
           echo "🚀 Deploying to Fly.io..."
           flyctl deploy --remote-only --strategy immediate --regions sin
 
       - name: Restart Fly.io App
         run: |
+          set -e
           echo "🔄 Restarting Fly.io App"
           MACHINE_ID=$(flyctl machines list --json | jq -r '.[0].id')
           if [ -n "$MACHINE_ID" ]; then
@@ -121,6 +129,7 @@ jobs:
     steps:
       - name: Send Telegram Notification
         run: |
+          set -e
           curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
                -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
                -d "text=✅ Deployment sukses! Aplikasi telah diperbarui dan berjalan di Fly.io 🚀"
@@ -128,6 +137,7 @@ jobs:
       # Untuk sementara task ini dinonaktifkan karena menyebabkan error
       # - name: Schedule Volume Check
       #   run: |
+      #     set -e
       #     export FLYCTL_INSTALL="/home/runner/.fly"
       #     export PATH="$FLYCTL_INSTALL/bin:$PATH"
       #     flyctl ssh console --command "bash /scripts/extend_volume.sh"
