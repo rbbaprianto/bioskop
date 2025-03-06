@@ -34,9 +34,15 @@ jobs:
           echo 'export FLYCTL_INSTALL="/home/runner/.fly"' >> ~/.bashrc
           echo 'export PATH="$FLYCTL_INSTALL/bin:$PATH"' >> ~/.bashrc
           source ~/.bashrc
-          
+
           curl https://rclone.org/install.sh | sudo bash
-          sudo apt-get update && sudo apt-get install -y jq gh docker.io
+          sudo apt-get update && sudo apt-get install -y jq gh
+          
+          # Perbaikan: Jangan install ulang docker.io
+          echo "🛠 Memeriksa versi Docker..."
+          docker --version || (echo "❌ Docker tidak ditemukan!" && exit 1)
+
+          echo "✅ Semua dependensi terinstall dengan benar."
 
   # 3️⃣ Build & Push Docker Image
   build-and-push:
