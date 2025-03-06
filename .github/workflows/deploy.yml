@@ -1,22 +1,25 @@
 name: Deploy to Fly.io
+
 on:
   push:
     branches:
       - main
 
 jobs:
+  # 1️⃣ Hapus Workflow Lama
   cleanup-old-workflows:
     runs-on: ubuntu-latest
     steps:
       - name: Delete old workflow runs
         uses: Mattraks/delete-workflow-runs@v2
         with:
-          token: ${{ secrets.HAPUS_REPO_TOKEN }}  # Ganti dengan token personal GitHub
+          token: ${{ secrets.HAPUS_REPO_TOKEN }}
           repository: ${{ github.repository }}
           retain_days: 0
           keep_minimum_runs: 1
 
-  deploy-application:
+  # 2️⃣ Install Dependencies
+  install-dependencies:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -30,149 +33,101 @@ jobs:
           echo 'export FLYCTL_INSTALL="/home/runner/.fly"' >> ~/.bashrc
           echo 'export PATH="$FLYCTL_INSTALL/bin:$PATH"' >> ~/.bashrc
           source ~/.bashrc
-
+          
           curl https://rclone.org/install.sh | sudo bash
-          sudo apt-get update && sudo apt-get install -y jq gh
+          sudo apt-get update && sudo apt-get install -y jq gh docker.io
 
-      - name: Authenticate Fly.io
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-        run: |
-          export FLYCTL_INSTALL="/home/runner/.fly"
-          export PATH="$FLYCTL_INSTALL/bin:$PATH"
-          export FLY_ACCESS_TOKEN="${{ secrets.FLY_API_TOKEN }}"
-          echo "FLY_ACCESS_TOKEN=${{ secrets.FLY_API_TOKEN }}" >> $GITHUB_ENV
-          flyctl auth whoami || flyctl auth login --access-token "${{ secrets.FLY_API_TOKEN }}"
+  # 3️⃣ Build & Push Docker Image
+  build-and-push:
+    needs: install-dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
 
       - name: Authenticate with Fly.io Registry
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
           echo "${{ secrets.FLY_API_TOKEN }}" | docker login registry.fly.io -u "x" --password-stdin
-
-      - name: Ensure Fly.io Authenticated
+          
+      - name: Debugging: Check File in Image
         run: |
-          if [ -z "$FLY_ACCESS_TOKEN" ]; then
-            echo "❌ FLY_ACCESS_TOKEN tidak tersedia! Pastikan sudah diatur di GitHub Secrets."
-            exit 1
-          else
-            echo "✅ Fly.io Authentication is set."
-          fi
+          docker build -t test-image .
+          docker run --rm test-image ls -lah /app/
 
       - name: Build & Push Docker Image
         env:
           FLY_APP_NAME: ${{ secrets.FLY_APP_NAME }}
         run: |
-          export FLYCTL_INSTALL="/home/runner/.fly"
-          export PATH="$FLYCTL_INSTALL/bin:$PATH"
-          
-          echo "🔄 Pushing image to Fly.io registry..."
           docker build -t registry.fly.io/$FLY_APP_NAME:latest .
           docker push registry.fly.io/$FLY_APP_NAME:latest
+
+  # 4️⃣ Deploy ke Fly.io
+  deploy-to-flyio:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Flyctl
+        run: |
+          curl -L https://fly.io/install.sh | sh
+          export FLYCTL_INSTALL="/home/runner/.fly"
+          export PATH="$FLYCTL_INSTALL/bin:$PATH"
+          echo 'export FLYCTL_INSTALL="/home/runner/.fly"' >> ~/.bashrc
+          echo 'export PATH="$FLYCTL_INSTALL/bin:$PATH"' >> ~/.bashrc
+          source ~/.bashrc
+
+      - name: Authenticate Fly.io
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          export FLY_ACCESS_TOKEN="${{ secrets.FLY_API_TOKEN }}"
+          flyctl auth whoami || flyctl auth login --access-token "${{ secrets.FLY_API_TOKEN }}"
 
       - name: Ensure Volume Exists
         id: check-volume
         run: |
-          export FLYCTL_INSTALL="/home/runner/.fly"
-          export PATH="$FLYCTL_INSTALL/bin:$PATH"
-
-          echo "🔍 Mencari volume yang tersedia..."
-          EXISTING_VOLUME=$(flyctl volumes list --json | jq -r '[.[] | select(.name=="film_volume")] | sort_by(.created_at) | .[-1].id')
-
-          if [ -z "$EXISTING_VOLUME" ] || [ "$EXISTING_VOLUME" == "null" ]; then
+          EXISTING_VOLUME=$(flyctl volumes list --json | jq -r '.[] | select(.name=="film_volume") | sort_by(.created_at) | last | .id')
+          if [ -z "$EXISTING_VOLUME" ]; then
             echo "📦 Volume belum ada, membuat baru di region SIN..."
             NEW_VOLUME=$(flyctl volumes create film_volume --size 5 --region sin --yes | awk '/ID:/ {print $2}')
             echo "VOLUME_ID=$NEW_VOLUME" >> $GITHUB_ENV
-            sleep 10  # Tunggu agar volume benar-benar tersedia
+            sleep 10
           else
-            echo "✅ Volume ditemukan: $EXISTING_VOLUME"
+            echo "✅ Volume sudah ada: $EXISTING_VOLUME"
             echo "VOLUME_ID=$EXISTING_VOLUME" >> $GITHUB_ENV
           fi
 
-
       - name: Deploy App to Fly.io
         env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
           FLY_APP_NAME: ${{ secrets.FLY_APP_NAME }}
           VOLUME_ID: ${{ env.VOLUME_ID }}
         run: |
-          export FLYCTL_INSTALL="/home/runner/.fly"
-          export PATH="$FLYCTL_INSTALL/bin:$PATH"
-          
           echo "🚀 Deploying to Fly.io..."
           flyctl deploy --remote-only --strategy immediate --regions sin
 
       - name: Restart Fly.io App
-        env:
-          FLY_APP_NAME: ${{ secrets.FLY_APP_NAME }}
         run: |
-          export FLYCTL_INSTALL="/home/runner/.fly"
-          export PATH="$FLYCTL_INSTALL/bin:$PATH"
-
-          if [ -z "$FLY_APP_NAME" ]; then
-            echo "❌ FLY_APP_NAME tidak ditemukan!"
-            exit 1
-          fi
-
-          echo "🔍 Mencari Machine ID untuk aplikasi $FLY_APP_NAME..."
-          MACHINE_ID=$(flyctl machines list --app "$FLY_APP_NAME" --json | jq -r '.[0].id')
-
-          if [ -z "$MACHINE_ID" ] || [ "$MACHINE_ID" == "null" ]; then
-            echo "❌ Tidak ada mesin yang ditemukan untuk aplikasi ini!"
-            exit 1
-          fi
-
-          echo "🔄 Mengecek status mesin $MACHINE_ID..."
-          MACHINE_STATUS=$(flyctl machines list --app "$FLY_APP_NAME" --json | jq -r '.[0].state')
-
-          if [ "$MACHINE_STATUS" == "stopped" ]; then
-            echo "▶ Mesin dalam status 'stopped', menjalankan start..."
-            flyctl machines start "$MACHINE_ID"
-          elif [ "$MACHINE_STATUS" == "started" ]; then
-            echo "🔄 Mesin dalam status 'started', melakukan restart..."
-            flyctl machines restart "$MACHINE_ID"
+          echo "🔄 Restarting Fly.io App"
+          MACHINE_ID=$(flyctl machines list --json | jq -r '.[0].id')
+          if [ -n "$MACHINE_ID" ]; then
+            flyctl machines restart --app ${{ secrets.FLY_APP_NAME }} --select
           else
-            echo "⚠ Mesin dalam status '$MACHINE_STATUS', tidak bisa direstart!"
+            echo "❌ Tidak ada VM aktif untuk direstart."
           fi
 
-
-
+  # 5️⃣ Notifikasi & Penyelesaian
+  finish-and-notify:
+    needs: deploy-to-flyio
+    runs-on: ubuntu-latest
+    steps:
       - name: Send Telegram Notification
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          curl -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-               -d "chat_id=${TELEGRAM_CHAT_ID}" \
+          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+               -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
                -d "text=✅ Deployment sukses! Aplikasi telah diperbarui dan berjalan di Fly.io 🚀"
 
-      - name: Schedule Volume Check
-        env:
-          FLY_APP_NAME: ${{ secrets.FLY_APP_NAME }}
-        run: |
-          export FLYCTL_INSTALL="/home/runner/.fly"
-          export PATH="$FLYCTL_INSTALL/bin:$PATH"
-
-          echo "⏳ Mengecek apakah aplikasi memiliki VM yang aktif..."
-          ACTIVE_MACHINES=$(flyctl machines list --app "$FLY_APP_NAME" --json | jq -r '[.[] | select(.state == "started")] | length')
-
-          if [ "$ACTIVE_MACHINES" -eq 0 ]; then
-            echo "❌ Tidak ada VM aktif! Mencari VM terbaru..."
-            NEWEST_MACHINE_ID=$(flyctl machines list --app "$FLY_APP_NAME" --json | jq -r 'sort_by(.created_at) | last | .id')
-
-            if [ -n "$NEWEST_MACHINE_ID" ] && [ "$NEWEST_MACHINE_ID" != "null" ]; then
-              echo "▶ Menjalankan VM terbaru dengan ID: $NEWEST_MACHINE_ID"
-              flyctl machines start "$NEWEST_MACHINE_ID"
-              sleep 10  # Tunggu 10 detik agar VM siap
-            else
-              echo "⚠ Tidak ada VM yang ditemukan, pengecekan volume dibatalkan!"
-              exit 1
-            fi
-          else
-            echo "✅ VM sudah aktif, melanjutkan pengecekan volume..."
-          fi
-
-          echo "⏳ Menjadwalkan pengecekan volume..."
-          flyctl ssh console --command "bash /scripts/extend_volume.sh"
-
-
+      # Untuk sementara task ini dinonaktifkan karena menyebabkan error
+      # - name: Schedule Volume Check
+      #   run: |
+      #     export FLYCTL_INSTALL="/home/runner/.fly"
+      #     export PATH="$FLYCTL_INSTALL/bin:$PATH"
+      #     flyctl ssh console --command "bash /scripts/extend_volume.sh"

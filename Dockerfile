@@ -1,8 +1,13 @@
 FROM python:3.9-slim
 
+# Mengatur direktori kerja dalam container
 WORKDIR /app
-COPY . /app
 
-RUN pip install --no-cache-dir -r requirements.txt
+# Salin semua file yang diperlukan, termasuk bot.py
+COPY . /app/
 
+# Pastikan bot.py memiliki izin eksekusi
+RUN chmod +x /app/bot.py
+
+# Menjalankan bot
 CMD ["python3", "/app/bot.py"]
