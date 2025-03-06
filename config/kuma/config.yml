@@ -1,0 +1,11 @@
+port: 3001
+database:
+  type: sqlite
+  file: /data/kuma.db
+monitoring:
+  interval: 60
+notifications:
+  - name: Telegram Alert
+    type: telegram
+    bot_token: "{{TELEGRAM_BOT_TOKEN}}"
+    chat_id: "{{TELEGRAM_CHAT_ID}}"

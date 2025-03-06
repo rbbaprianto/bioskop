@@ -20,13 +20,19 @@ git clone https://github.com/rbbaprianto/bioskop.git
 cd bioskop
 ```
 
-### 2. Buat File `.env`
-Buat file `.env` berdasarkan contoh di `.env.example`:
-```sh
-cp .env.example .env
-nano .env  # Edit dan isi dengan informasi rahasia Anda
-```
-
+### 2. Atur secret GitHub di repository:
+   - `FLY_API_TOKEN`
+   - `TELEGRAM_BOT_TOKEN`
+   - `RPC_SECRET`
+   - `SONARR_API_KEY`
+   - `RADARR_API_KEY`
+   - `BAZARR_API_KEY`
+   - `QBITTORRENT_USERNAME`
+   - `QBITTORRENT_PASSWORD`
+   - `TAILSCALE_AUTHKEY`
+   - `FLY_VOLUME_ID`
+   
+   
 ### 3. Deploy ke Fly.io
 Pastikan sudah login ke Fly.io:
 ```sh
@@ -68,3 +74,12 @@ Gunakan perintah ini di bot Telegram:
 
 ## Lisensi
 Proyek ini menggunakan lisensi MIT.
+
+
+### Layanan yang Ditambahkan:
+- ✅ Bazarr
+- ✅ Caddy (Reverse Proxy + HTTPS)
+- ✅ Tailscale
+- ✅ Sonarr & Radarr
+- ✅ Notifikasi Telegram/Discord
+- ✅ Dashy (UI Dashboard)

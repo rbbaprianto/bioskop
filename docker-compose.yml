@@ -1,68 +1,63 @@
-version: '3.8'
+version: "3.8"
 
 services:
-  bioskop-jellyfin:
+  jellyfin:
     image: jellyfin/jellyfin
-    container_name: bioskop-jellyfin
-    volumes:
-      - ./config/jellyfin:/config
-      - /film:/film
+    container_name: jellyfin
+    restart: unless-stopped
     ports:
       - "8096:8096"
-
-  bioskop-aria2:
-    image: p3terx/aria2-pro
-    container_name: bioskop-aria2
     volumes:
-      - ./config/aria2:/config
-      - /film:/film
-    ports:
-      - "6800:6800"
+      - ./config/jellyfin:/config
+      - ./media:/media
 
-  bioskop-qbittorrent:
+  qbittorrent:
     image: linuxserver/qbittorrent
-    container_name: bioskop-qbittorrent
-    volumes:
-      - ./config/qbittorrent:/config
-      - /film:/downloads
+    container_name: qbittorrent
+    restart: unless-stopped
     ports:
       - "6881:6881"
       - "6881:6881/udp"
-
-  bioskop-uptime-kuma:
-    image: louislam/uptime-kuma
-    container_name: bioskop-uptime-kuma
+      - "8080:8080"
     volumes:
-      - ./config/kuma:/app/data
-    ports:
-      - "3001:3001"
+      - ./config/qbittorrent:/config
+      - ./downloads:/downloads
 
-  bioskop-filebrowser:
-    image: filebrowser/filebrowser
-    container_name: bioskop-filebrowser
+  sonarr:
+    image: linuxserver/sonarr
+    container_name: sonarr
+    restart: unless-stopped
+    ports:
+      - "8989:8989"
     volumes:
-      - /film:/srv
-    ports:
-      - "8080:80"
+      - ./config/sonarr:/config
+      - ./downloads:/downloads
 
-  bioskop-prowlarr:
-    image: linuxserver/prowlarr
-    container_name: bioskop-prowlarr
+  radarr:
+    image: linuxserver/radarr
+    container_name: radarr
+    restart: unless-stopped
+    ports:
+      - "7878:7878"
     volumes:
-      - ./config/prowlarr:/config
-    ports:
-      - "9696:9696"
+      - ./config/radarr:/config
+      - ./downloads:/downloads
 
-  bioskop-organizr:
-    image: organizr/organizr
-    container_name: bioskop-organizr
+  bazarr:
+    image: linuxserver/bazarr
+    container_name: bazarr
+    restart: unless-stopped
+    ports:
+      - "6767:6767"
     volumes:
-      - ./config/organizr:/config
-    ports:
-      - "80:80"
+      - ./config/bazarr:/config
+      - ./downloads:/downloads
 
-  bioskop-netdata:
-    image: netdata/netdata
-    container_name: bioskop-netdata
-    ports:
-      - "19999:19999"
+  tailscale:
+    image: tailscale/tailscale
+    container_name: tailscale
+    restart: unless-stopped
+    privileged: true
+    network_mode: "host"
+    volumes:
+      - /var/lib/tailscale:/var/lib/tailscale

@@ -1,0 +1,11 @@
+telegram:
+  bot_token: "{{TELEGRAM_BOT_TOKEN}}"
+  chat_id: "{{TELEGRAM_CHAT_ID}}"
+
+commands:
+  - name: start
+    description: "Mulai bot"
+  - name: status
+    description: "Cek status server"
+  - name: extend_volume
+    description: "Perbesar volume storage jika hampir penuh"

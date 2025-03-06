@@ -1,0 +1,17 @@
+{
+  "server": {
+    "bindAddress": "0.0.0.0",
+    "publicPort": 8096,
+    "logLevel": "info"
+  },
+  "mediaLibrary": {
+    "path": "/data/media"
+  },
+  "users": [
+    {
+      "name": "robby",
+      "password": "masrobby",
+      "isAdmin": true
+    }
+  ]
+}
