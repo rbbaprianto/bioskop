@@ -82,7 +82,8 @@ jobs:
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
 
-          EXISTING_VOLUME=$(flyctl volumes list --json | jq -r '.[] | select(.name=="film_volume") | sort_by(.created_at) | last | .id')
+          # Cek apakah ada volume yang tersedia
+          EXISTING_VOLUME=$(flyctl volumes list --json | jq -r 'select(length > 0) | map(select(.name=="film_volume")) | sort_by(.created_at) | last | .id // empty')
 
           if [ -z "$EXISTING_VOLUME" ]; then
             echo "📦 Volume belum ada, membuat baru di region SIN..."
@@ -93,6 +94,7 @@ jobs:
             echo "✅ Volume sudah ada: $EXISTING_VOLUME"
             echo "VOLUME_ID=$EXISTING_VOLUME" >> $GITHUB_ENV
           fi
+
 
 
       - name: Push Docker Image to Fly.io
