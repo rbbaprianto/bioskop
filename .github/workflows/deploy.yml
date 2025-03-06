@@ -120,8 +120,19 @@ jobs:
             exit 1
           fi
 
-          echo "🔄 Restarting Fly.io App dengan Machine ID: $MACHINE_ID"
-          flyctl machines restart "$MACHINE_ID"
+          echo "🔄 Mengecek status mesin $MACHINE_ID..."
+          MACHINE_STATUS=$(flyctl machines list --app "$FLY_APP_NAME" --json | jq -r '.[0].state')
+
+          if [ "$MACHINE_STATUS" == "stopped" ]; then
+            echo "▶ Mesin dalam status 'stopped', menjalankan start..."
+            flyctl machines start "$MACHINE_ID"
+          elif [ "$MACHINE_STATUS" == "started" ]; then
+            echo "🔄 Mesin dalam status 'started', melakukan restart..."
+            flyctl machines restart "$MACHINE_ID"
+          else
+            echo "⚠ Mesin dalam status '$MACHINE_STATUS', tidak bisa direstart!"
+          fi
+
 
 
       - name: Send Telegram Notification
