@@ -11,11 +11,10 @@ jobs:
       - name: Delete old workflow runs
         uses: Mattraks/delete-workflow-runs@v2
         with:
-          token: ${{ secrets.HAPUS_REPO_TOKEN }}  # Ganti dengan nama secret PAT
+          token: ${{ secrets.HAPUS_REPO_TOKEN }}  # Ganti dengan token personal GitHub
           repository: ${{ github.repository }}
           retain_days: 0
           keep_minimum_runs: 1
-
 
   deploy-application:
     runs-on: ubuntu-latest
@@ -31,7 +30,7 @@ jobs:
           echo 'export FLYCTL_INSTALL="/home/runner/.fly"' >> ~/.bashrc
           echo 'export PATH="$FLYCTL_INSTALL/bin:$PATH"' >> ~/.bashrc
           source ~/.bashrc
-          
+
           curl https://rclone.org/install.sh | sudo bash
           sudo apt-get update && sudo apt-get install -y jq gh
 
@@ -41,11 +40,24 @@ jobs:
         run: |
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
+          export FLY_ACCESS_TOKEN="${{ secrets.FLY_API_TOKEN }}"
+          echo "FLY_ACCESS_TOKEN=${{ secrets.FLY_API_TOKEN }}" >> $GITHUB_ENV
           flyctl auth whoami || flyctl auth login --access-token "${{ secrets.FLY_API_TOKEN }}"
 
       - name: Authenticate with Fly.io Registry
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
           echo "${{ secrets.FLY_API_TOKEN }}" | docker login registry.fly.io -u "x" --password-stdin
+
+      - name: Ensure Fly.io Authenticated
+        run: |
+          if [ -z "$FLY_ACCESS_TOKEN" ]; then
+            echo "❌ FLY_ACCESS_TOKEN tidak tersedia! Pastikan sudah diatur di GitHub Secrets."
+            exit 1
+          else
+            echo "✅ Fly.io Authentication is set."
+          fi
 
       - name: Build & Push Docker Image
         env:
@@ -63,19 +75,20 @@ jobs:
         run: |
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
-          EXISTING_VOLUME=$(flyctl volumes list --json | jq -r '.[] | select(.name=="film_volume") | sort_by(.created_at) | last | .id')
+          
+          EXISTING_VOLUME=$(flyctl volumes list --json | jq -r '.[] | select(.name=="film_volume") | sort_by(.created_at) | .id' | tail -n1)
+
           if [ -z "$EXISTING_VOLUME" ]; then
             echo "📦 Volume belum ada, membuat baru di region SIN..."
             NEW_VOLUME=$(flyctl volumes create film_volume --size 5 --region sin --yes | awk '/ID:/ {print $2}')
             echo "VOLUME_ID=$NEW_VOLUME" >> $GITHUB_ENV
-            sleep 10  # Tunggu agar volume benar-benar tersedia
+            sleep 10
           else
             echo "✅ Volume sudah ada: $EXISTING_VOLUME"
             echo "VOLUME_ID=$EXISTING_VOLUME" >> $GITHUB_ENV
           fi
 
-
-      - name: Deploy Application
+      - name: Deploy App to Fly.io
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
           FLY_APP_NAME: ${{ secrets.FLY_APP_NAME }}
@@ -83,24 +96,38 @@ jobs:
         run: |
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
+          
           echo "🚀 Deploying to Fly.io..."
           flyctl deploy --remote-only --strategy immediate --regions sin
 
-      - name: Restart Application
+      - name: Restart Fly.io App
+        env:
+          FLY_APP_NAME: ${{ secrets.FLY_APP_NAME }}
         run: |
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
-          echo "🔄 Restarting Fly.io App"
-          flyctl machines restart --app $FLY_APP_NAME
+          
+          if [ -n "$FLY_APP_NAME" ]; then
+            echo "🔄 Restarting Fly.io App: $FLY_APP_NAME"
+            flyctl machines restart --app "$FLY_APP_NAME"
+          else
+            echo "❌ FLY_APP_NAME tidak ditemukan!"
+            exit 1
+          fi
 
       - name: Send Telegram Notification
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-               -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+          curl -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+               -d "chat_id=${TELEGRAM_CHAT_ID}" \
                -d "text=✅ Deployment sukses! Aplikasi telah diperbarui dan berjalan di Fly.io 🚀"
 
       - name: Schedule Volume Check
         run: |
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
+          
+          echo "⏳ Menjadwalkan pengecekan volume..."
           flyctl ssh console --command "bash /scripts/extend_volume.sh"
