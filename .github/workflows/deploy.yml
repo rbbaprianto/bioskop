@@ -17,7 +17,7 @@ jobs:
           keep_minimum_runs: 1
 
 
-  install-dependencies:
+  deploy-application:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -42,13 +42,6 @@ jobs:
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
           flyctl auth whoami || flyctl auth login --access-token "${{ secrets.FLY_API_TOKEN }}"
-
-  compose-application:
-    runs-on: ubuntu-latest
-    needs: install-dependencies
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
 
       - name: Authenticate with Fly.io Registry
         run: |
@@ -81,12 +74,6 @@ jobs:
             echo "VOLUME_ID=$EXISTING_VOLUME" >> $GITHUB_ENV
           fi
 
-  deploy-application:
-    runs-on: ubuntu-latest
-    needs: compose-application
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
 
       - name: Deploy Application
         env:
@@ -105,10 +92,6 @@ jobs:
           echo "🔄 Restarting Fly.io App"
           flyctl machines restart --app $FLY_APP_NAME
 
-  finish-deployment:
-    runs-on: ubuntu-latest
-    needs: deploy-application
-    steps:
       - name: Send Telegram Notification
         run: |
           curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
