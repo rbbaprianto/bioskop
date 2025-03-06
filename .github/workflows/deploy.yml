@@ -60,6 +60,23 @@ jobs:
             echo "✅ Volume sudah ada: $EXISTING_VOLUME"
           fi
 
+      - name: Check Existing Machine
+        id: check_machine
+        run: |
+          export FLYCTL_INSTALL="/home/runner/.fly"
+          export PATH="$FLYCTL_INSTALL/bin:$PATH"
+
+          # Cek apakah ada mesin yang aktif
+          EXISTING_MACHINE=$(flyctl machines list --json | jq -r '.[0].id')
+
+          if [ -n "$EXISTING_MACHINE" ]; then
+            echo "✅ Mesin ditemukan: $EXISTING_MACHINE"
+            echo "MACHINE_ID=$EXISTING_MACHINE" >> $GITHUB_ENV
+          else
+            echo "🚀 Tidak ada mesin, akan membuat baru..."
+            echo "MACHINE_ID=" >> $GITHUB_ENV
+          fi
+
       - name: Deploy or Update App
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -69,26 +86,26 @@ jobs:
           RCLONE_ACCESS_TOKEN: ${{ secrets.RCLONE_ACCESS_TOKEN }}
           RCLONE_REFRESH_TOKEN: ${{ secrets.RCLONE_REFRESH_TOKEN }}
           FLY_ACCESS_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          MACHINE_ID: ${{ env.MACHINE_ID }}
         run: |
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
 
-          # Cek apakah aplikasi sudah ada
-          APP_EXISTS=$(flyctl apps list --json | jq -r --arg APP "$FLY_APP_NAME" '.[] | select(.Name==$APP) | .Name')
-
-          if [ -z "$APP_EXISTS" ]; then
-            echo "🚀 Aplikasi belum ada, melakukan deploy pertama kali..."
-            flyctl deploy --remote-only --regions sin
+          if [ -n "$MACHINE_ID" ]; then
+            echo "🔄 Mesin sudah ada, melakukan update..."
+            flyctl deploy --remote-only --strategy immediate --regions sin
           else
-            echo "🔄 Aplikasi sudah ada, melakukan update..."
-            flyctl deploy --remote-only --regions sin --strategy immediate
+            echo "🚀 Membuat mesin baru di SIN..."
+            flyctl deploy --remote-only --region sin
           fi
 
       - name: Restart App After Update
+        if: env.MACHINE_ID != ''
         run: |
-          source ~/.bashrc
-          echo "🔄 Restarting Fly.io App"
-          flyctl machines restart --app $FLY_APP_NAME
+          export FLYCTL_INSTALL="/home/runner/.fly"
+          export PATH="$FLYCTL_INSTALL/bin:$PATH"
+          echo "🔄 Restarting Fly.io Machine"
+          flyctl machines restart --app $FLY_APP_NAME --select
 
       - name: Start Telegram Bot
         run: nohup python3 /app/bot/bot.py & 
