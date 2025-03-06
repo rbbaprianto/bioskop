@@ -77,21 +77,23 @@ jobs:
           fi
 
 
-      - name: Check Existing Machine
-        id: check_machine
+      - name: Ensure Volume Exists
         run: |
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
 
-          EXISTING_MACHINE=$(flyctl machines list --json | jq -r '.[] | select(.state == "started") | .id')
+          EXISTING_VOLUME=$(flyctl volumes list --json | jq -r '.[] | select(.name=="film_volume") | sort_by(.created_at) | last | .id')
 
-          if [ -n "$EXISTING_MACHINE" ]; then
-            echo "✅ Mesin ditemukan: $EXISTING_MACHINE"
-            echo "MACHINE_ID=$EXISTING_MACHINE" >> $GITHUB_ENV
+          if [ -z "$EXISTING_VOLUME" ]; then
+            echo "📦 Volume belum ada, membuat baru di region SIN..."
+            NEW_VOLUME=$(flyctl volumes create film_volume --size 5 --region sin --yes | awk '/ID:/ {print $2}')
+            echo "VOLUME_ID=$NEW_VOLUME" >> $GITHUB_ENV
+            sleep 10  # Tunggu agar volume benar-benar tersedia
           else
-            echo "🚀 Tidak ada mesin, akan membuat baru..."
-            echo "MACHINE_ID=" >> $GITHUB_ENV
+            echo "✅ Volume sudah ada: $EXISTING_VOLUME"
+            echo "VOLUME_ID=$EXISTING_VOLUME" >> $GITHUB_ENV
           fi
+
 
       - name: Push Docker Image to Fly.io
         run: |
