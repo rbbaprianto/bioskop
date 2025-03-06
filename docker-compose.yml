@@ -15,52 +15,129 @@ services:
       - JELLYFIN_PublishedServerUrl=http://localhost:8096
 
   qbittorrent:
-    image: linuxserver/qbittorrent
+    image: lscr.io/linuxserver/qbittorrent:latest
     container_name: qbittorrent
     restart: unless-stopped
+    network_mode: bridge
     ports:
-      - "6881:6881"
-      - "6881:6881/udp"
       - "8080:8080"
+      - "6881:6881/tcp"
+      - "6881:6881/udp"
     volumes:
       - ./config/qbittorrent:/config
       - ./downloads:/downloads
+    environment:
+      - WEBUI_PORT=8080
+      - PUID=1000
+      - PGID=1000
 
   sonarr:
-    image: linuxserver/sonarr
+    image: linuxserver/sonarr:latest
     container_name: sonarr
     restart: unless-stopped
+    network_mode: bridge
     ports:
       - "8989:8989"
     volumes:
       - ./config/sonarr:/config
+      - ./media:/media
       - ./downloads:/downloads
+    environment:
+      - PUID=1000
+      - PGID=1000
 
   radarr:
-    image: linuxserver/radarr
+    image: linuxserver/radarr:latest
     container_name: radarr
     restart: unless-stopped
+    network_mode: bridge
     ports:
       - "7878:7878"
     volumes:
       - ./config/radarr:/config
+      - ./media:/media
       - ./downloads:/downloads
+    environment:
+      - PUID=1000
+      - PGID=1000
 
   bazarr:
-    image: linuxserver/bazarr
+    image: linuxserver/bazarr:latest
     container_name: bazarr
     restart: unless-stopped
+    network_mode: bridge
     ports:
       - "6767:6767"
     volumes:
       - ./config/bazarr:/config
+      - ./media:/media
       - ./downloads:/downloads
+    environment:
+      - PUID=1000
+      - PGID=1000
 
-  tailscale:
-    image: tailscale/tailscale
-    container_name: tailscale
+  prowlarr:
+    image: linuxserver/prowlarr:latest
+    container_name: prowlarr
     restart: unless-stopped
-    privileged: true
-    network_mode: "host"
+    network_mode: bridge
+    ports:
+      - "9696:9696"
     volumes:
-      - /var/lib/tailscale:/var/lib/tailscale
+      - ./config/prowlarr:/config
+    environment:
+      - PUID=1000
+      - PGID=1000
+
+  aria2:
+    image: p3terx/aria2-pro
+    container_name: aria2
+    restart: unless-stopped
+    network_mode: bridge
+    ports:
+      - "6800:6800"
+    volumes:
+      - ./config/aria2:/config
+      - ./downloads:/downloads
+    environment:
+      - RPC_SECRET=mysecret
+
+  filebrowser:
+    image: filebrowser/filebrowser
+    container_name: filebrowser
+    restart: unless-stopped
+    network_mode: bridge
+    ports:
+      - "8081:80"
+    volumes:
+      - ./media:/srv
+      - ./config/filebrowser:/config
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:latest
+    container_name: uptime-kuma
+    restart: unless-stopped
+    network_mode: bridge
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./config/uptime-kuma:/config
+
+  bot:
+    build: ./scripts  # Gunakan Dockerfile khusus untuk bot
+    container_name: telegram-bot
+    restart: unless-stopped
+    network_mode: bridge
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+
+  dashboard:
+    image: lissy93/dashy:latest
+    container_name: dashy
+    restart: unless-stopped
+    network_mode: bridge
+    ports:
+      - "4000:80"
+    volumes:
+      - ./config/dashy:/config
