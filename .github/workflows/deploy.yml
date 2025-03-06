@@ -52,8 +52,7 @@ jobs:
 
       - name: Authenticate with Fly.io Registry
         run: |
-    	   echo "${{ secrets.FLY_API_TOKEN }}" | docker login registry.fly.io -u "x" --password-stdin
-
+          echo "${{ secrets.FLY_API_TOKEN }}" | docker login registry.fly.io -u "x" --password-stdin
 
       - name: Build & Push Docker Image
         env:
