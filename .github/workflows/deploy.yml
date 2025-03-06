@@ -67,6 +67,13 @@ jobs:
           else
             echo "✅ Volume sudah ada: $EXISTING_VOLUME"
           fi
+          
+          # Pastikan volume terhubung ke mesin yang benar
+          MACHINE_ID=$(flyctl machines list --json | jq -r '.[0].id')
+          if [ -n "$MACHINE_ID" ]; then
+            echo "🔄 Menghubungkan volume ke mesin: $MACHINE_ID"
+            flyctl machines update $MACHINE_ID --attach-volume $EXISTING_VOLUME:/film
+          fi
 
       - name: Deploy to Fly.io
         env:
