@@ -12,6 +12,16 @@ Bioskop adalah sistem media server yang menggabungkan **Jellyfin, Aria2, rclone,
 - **Organizr**: Panel kontrol untuk menyatukan semua layanan.
 - **Netdata**: Monitoring kinerja server.
 
+
+## Layanan yang Ditambahkan:
+- ✅ Bazarr
+- ✅ Caddy (Reverse Proxy + HTTPS)
+- ✅ Tailscale
+- ✅ Sonarr & Radarr
+- ✅ Notifikasi Telegram/Discord
+- ✅ Dashy (UI Dashboard)
+
+
 ## Cara Install
 
 ### 1. Clone Repository
@@ -74,12 +84,3 @@ Gunakan perintah ini di bot Telegram:
 
 ## Lisensi
 Proyek ini menggunakan lisensi MIT.
-
-
-### Layanan yang Ditambahkan:
-- ✅ Bazarr
-- ✅ Caddy (Reverse Proxy + HTTPS)
-- ✅ Tailscale
-- ✅ Sonarr & Radarr
-- ✅ Notifikasi Telegram/Discord
-- ✅ Dashy (UI Dashboard)
