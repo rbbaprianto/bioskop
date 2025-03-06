@@ -44,7 +44,8 @@ jobs:
           echo "FLY_ACCESS_TOKEN=${{ secrets.FLY_API_TOKEN }}" >> $GITHUB_ENV
           flyctl auth whoami || flyctl auth login --access-token "${{ secrets.FLY_API_TOKEN }}"
 
-      - name: Ensure Volume Exists (or Attach Existing)
+      - name: Ensure Volume Exists
+        id: check_volume
         run: |
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
@@ -58,6 +59,7 @@ jobs:
             sleep 5
           else
             echo "✅ Volume sudah ada: $EXISTING_VOLUME"
+            echo "VOLUME_ID=$EXISTING_VOLUME" >> $GITHUB_ENV
           fi
 
       - name: Check Existing Machine
@@ -87,6 +89,7 @@ jobs:
           RCLONE_REFRESH_TOKEN: ${{ secrets.RCLONE_REFRESH_TOKEN }}
           FLY_ACCESS_TOKEN: ${{ secrets.FLY_API_TOKEN }}
           MACHINE_ID: ${{ env.MACHINE_ID }}
+          VOLUME_ID: ${{ env.VOLUME_ID }}
         run: |
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
@@ -96,7 +99,10 @@ jobs:
             flyctl deploy --remote-only --strategy immediate --regions sin
           else
             echo "🚀 Membuat mesin baru di SIN..."
-            flyctl deploy --remote-only --region sin
+            flyctl machine run registry.fly.io/$FLY_APP_NAME:latest \
+              --name $FLY_APP_NAME \
+              --region sin \
+              --volume $VOLUME_ID:/film
           fi
 
       - name: Restart App After Update
@@ -104,6 +110,7 @@ jobs:
         run: |
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
+          
           echo "🔄 Restarting Fly.io Machine"
           flyctl machines restart --app $FLY_APP_NAME --select
 
