@@ -80,16 +80,3 @@ jobs:
         run: |
           source ~/.bashrc
           /home/runner/.fly/bin/flyctl ssh console --command "bash /scripts/extend_volume.sh"
-
-
-  cleanup-failed-workflow:
-    if: failure()  # Hanya dijalankan jika workflow gagal
-    runs-on: ubuntu-latest
-    steps:
-      - name: Delete failed workflow run
-        uses: Mattraks/delete-workflow-runs@v2
-        with:
-          token: ${{ secrets.HAPUS_REPO_TOKEN }}
-          repository: ${{ github.repository }}
-          retain_days: 0  # Hapus langsung
-          keep_minimum_runs: 0  # Hapus semua workflow jika gagal
