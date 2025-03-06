@@ -43,9 +43,9 @@ RUN mkdir -p /dashy && cd /dashy && \
 RUN mkdir -p /config
 
 # Copy config files
-COPY config/ /config/
+COPY ./config/ /config/
 COPY scripts/start.sh /scripts/start.sh
-COPY config/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY ./config/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Berikan izin eksekusi ke start.sh
 RUN chmod +x /scripts/start.sh

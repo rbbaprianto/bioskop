@@ -27,7 +27,7 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
           source ~/.bashrc
-          /home/runner/.fly/bin/flyctl auth login --access-token "${{ secrets.FLY_API_TOKEN }}"
+          /home/runner/.fly/bin/flyctl auth token
 
       - name: Use Rclone Tokens from Secrets
         run: |
