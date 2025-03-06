@@ -15,19 +15,24 @@ jobs:
           curl -L https://fly.io/install.sh | sh
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
+          echo 'export FLYCTL_INSTALL="/home/runner/.fly"' >> ~/.bashrc
           echo 'export PATH="$FLYCTL_INSTALL/bin:$PATH"' >> ~/.bashrc
           source ~/.bashrc
-
+          
           curl https://rclone.org/install.sh | sudo bash
           sudo apt-get update && sudo apt-get install -y jq gh
 
       - name: Authenticate Fly.io
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-        run: flyctl auth login --access-token "${{ secrets.FLY_API_TOKEN }}"
+        run: |
+          source ~/.bashrc
+          /home/runner/.fly/bin/flyctl auth login --access-token "${{ secrets.FLY_API_TOKEN }}"
 
       - name: Configure Rclone and Get Tokens
         run: |
+          source ~/.bashrc
+          
           # Buat konfigurasi Rclone untuk Google Drive
           rclone config create gdrive drive scope drive config_is_local false
           
@@ -57,7 +62,9 @@ jobs:
           RPC_SECRET: ${{ secrets.RPC_SECRET }}
           RCLONE_ACCESS_TOKEN: ${{ secrets.RCLONE_ACCESS_TOKEN }}
           RCLONE_REFRESH_TOKEN: ${{ secrets.RCLONE_REFRESH_TOKEN }}
-        run: flyctl deploy --remote-only
+        run: |
+          source ~/.bashrc
+          /home/runner/.fly/bin/flyctl deploy --remote-only
 
       - name: Start Telegram Bot
         run: nohup python3 /app/bot/bot.py & 
@@ -69,4 +76,6 @@ jobs:
                -d "text=✅ Deployment berhasil! Aplikasi telah diperbarui dan berjalan di Fly.io 🚀"
 
       - name: Schedule Volume Check
-        run: flyctl ssh console --command "bash /scripts/extend_volume.sh"
+        run: |
+          source ~/.bashrc
+          /home/runner/.fly/bin/flyctl ssh console --command "bash /scripts/extend_volume.sh"
