@@ -49,22 +49,14 @@ jobs:
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
 
-          echo "🔄 Memeriksa volume yang tidak digunakan..."
-          flyctl volumes list --json | jq -r '.[] | select(.AttachedMachine == null) | .ID' > unused_volumes.txt
+          echo "🗑️  Menghapus volume yang tidak terpakai..."
+          flyctl volumes list --json | jq -r '.[] | select(.attached_machine_id == null and .state == "created") | .id' | while read vol; do
+            if [ ! -z "$vol" ]; then
+              echo "🗑️  Menghapus volume: $vol"
+              flyctl volumes delete $vol --yes
+            fi
+          done
 
-          if [ -s unused_volumes.txt ]; then
-            cat unused_volumes.txt | while read vol; do
-              if [ -n "$vol" ] && [ "$vol" != "null" ]; then
-                echo "🗑️ Menghapus volume: $vol"
-                flyctl volumes delete $vol --yes
-                sleep 3  # Tunggu agar perubahan tersinkronisasi
-              fi
-            done
-          else
-            echo "✅ Tidak ada volume yang perlu dihapus."
-          fi
-
-          rm -f unused_volumes.txt
 
       - name: Ensure Volume Exists
         id: check_volume
@@ -72,11 +64,11 @@ jobs:
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
 
-          EXISTING_VOLUME=$(flyctl volumes list --json | jq -r '.[] | select(.Name=="film_volume") | .ID')
+          EXISTING_VOLUME=$(flyctl volumes list --json | jq -r '.[] | select(.name=="film_volume") | .id')
 
           if [ -z "$EXISTING_VOLUME" ]; then
             echo "📦 Volume belum ada, membuat baru di region SIN..."
-            NEW_VOLUME=$(flyctl volumes create film_volume --size 10 --region sin --yes | awk '/ID:/ {print $2}')
+            NEW_VOLUME=$(flyctl volumes create film_volume --size 5 --region sin --yes | awk '/id:/ {print $2}')
             echo "VOLUME_ID=$NEW_VOLUME" >> $GITHUB_ENV
             sleep 10  # Tunggu agar volume benar-benar tersedia
           else
@@ -101,6 +93,15 @@ jobs:
             echo "MACHINE_ID=" >> $GITHUB_ENV
           fi
 
+      - name: Push Docker Image to Fly.io
+        run: |
+          export FLYCTL_INSTALL="/home/runner/.fly"
+          export PATH="$FLYCTL_INSTALL/bin:$PATH"
+
+          echo "🔄 Pushing image to Fly.io registry..."
+          docker tag $FLY_APP_NAME registry.fly.io/$FLY_APP_NAME:latest
+          docker push registry.fly.io/$FLY_APP_NAME:latest
+
       - name: Deploy or Update App
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -122,6 +123,11 @@ jobs:
           else
             echo "🚀 Membuat mesin baru di SIN..."
             sleep 5  # Tunggu agar volume tersedia
+
+            # 🔹 **Tambahkan langkah push image ke Fly.io registry di sini**
+            echo "🔄 Pushing image to Fly.io registry..."
+            docker tag $FLY_APP_NAME registry.fly.io/$FLY_APP_NAME:latest
+            docker push registry.fly.io/$FLY_APP_NAME:latest
 
             flyctl machine run registry.fly.io/$FLY_APP_NAME:latest \
               --app $FLY_APP_NAME \
