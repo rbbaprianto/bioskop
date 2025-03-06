@@ -69,72 +69,86 @@ jobs:
           docker build -t registry.fly.io/$FLY_APP_NAME:latest .
           docker push registry.fly.io/$FLY_APP_NAME:latest
 
-  # 4️⃣ Deploy ke Fly.io
-  deploy-to-flyio:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    steps:
-      - name: Install Flyctl
-        run: |
-          set -e
+# 4️⃣ Deploy ke Fly.io
+deploy-to-flyio:
+  needs: build-and-push
+  runs-on: ubuntu-latest
+  steps:
+    - name: Install Flyctl
+      run: |
+        set -e
+        if ! command -v flyctl &> /dev/null; then
+          echo "🔽 Installing Flyctl..."
           curl -L https://fly.io/install.sh | sh
           export FLYCTL_INSTALL="/home/runner/.fly"
           export PATH="$FLYCTL_INSTALL/bin:$PATH"
-          echo 'export FLYCTL_INSTALL="/home/runner/.fly"' >> ~/.bashrc
-          echo 'export PATH="$FLYCTL_INSTALL/bin:$PATH"' >> ~/.bashrc
-          source ~/.bashrc
+          echo "✅ Flyctl installed successfully."
+        else
+          echo "✅ Flyctl already installed."
+        fi
 
-      - name: Authenticate Fly.io
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-        run: |
-          set -e
-          export FLYCTL_INSTALL="/home/runner/.fly"
-          export PATH="$FLYCTL_INSTALL/bin:$PATH"
-          export FLY_ACCESS_TOKEN="${{ secrets.FLY_API_TOKEN }}"
-          flyctl auth whoami || flyctl auth login --access-token "${{ secrets.FLY_API_TOKEN }}"
+    - name: Authenticate Fly.io
+      env:
+        FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      run: |
+        set -e
+        export FLYCTL_INSTALL="/home/runner/.fly"
+        export PATH="$FLYCTL_INSTALL/bin:$PATH"
+        flyctl auth whoami || flyctl auth login --access-token "${{ secrets.FLY_API_TOKEN }}"
 
-      - name: Ensure Volume Exists
-        id: check-volume
-        run: |
-          set -e
-          export FLYCTL_INSTALL="/home/runner/.fly"
-          export PATH="$FLYCTL_INSTALL/bin:$PATH"
-          EXISTING_VOLUME=$(flyctl volumes list --json | jq -r '.[] | select(.name=="film_volume") | sort_by(.created_at) | last | .id')
-          if [ -z "$EXISTING_VOLUME" ]; then
-            echo "📦 Volume belum ada, membuat baru di region SIN..."
-            NEW_VOLUME=$(flyctl volumes create film_volume --size 5 --region sin --yes | awk '/ID:/ {print $2}')
-            echo "VOLUME_ID=$NEW_VOLUME" >> $GITHUB_ENV
-            sleep 10
-          else
-            echo "✅ Volume sudah ada: $EXISTING_VOLUME"
-            echo "VOLUME_ID=$EXISTING_VOLUME" >> $GITHUB_ENV
-          fi
+    - name: Ensure Volume Exists
+      id: check-volume
+      run: |
+        set -e
+        export FLYCTL_INSTALL="/home/runner/.fly"
+        export PATH="$FLYCTL_INSTALL/bin:$PATH"
 
-      - name: Deploy App to Fly.io
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-          FLY_APP_NAME: ${{ secrets.FLY_APP_NAME }}
-          VOLUME_ID: ${{ env.VOLUME_ID }}
-        run: |
-          set -e
-          export FLYCTL_INSTALL="/home/runner/.fly"
-          export PATH="$FLYCTL_INSTALL/bin:$PATH"
-          echo "🚀 Deploying to Fly.io..."
-          flyctl deploy --remote-only --strategy immediate --regions sin
+        EXISTING_VOLUME=$(flyctl volumes list --json | jq -r '.[] | select(.name=="film_volume") | sort_by(.created_at) | .id' | tail -n1)
 
-      - name: Restart Fly.io App
-        run: |
-          set -e
-          export FLYCTL_INSTALL="/home/runner/.fly"
-          export PATH="$FLYCTL_INSTALL/bin:$PATH"
-          echo "🔄 Restarting Fly.io App"
-          MACHINE_ID=$(flyctl machines list --json | jq -r '.[0].id')
-          if [ -n "$MACHINE_ID" ]; then
-            flyctl machines restart --app ${{ secrets.FLY_APP_NAME }} --select
-          else
-            echo "❌ Tidak ada VM aktif untuk direstart."
-          fi
+        if [ -z "$EXISTING_VOLUME" ] || [ "$EXISTING_VOLUME" = "null" ]; then
+          echo "📦 Volume belum ada, membuat baru di region SIN..."
+          NEW_VOLUME=$(flyctl volumes create film_volume --size 5 --region sin --yes | awk '/ID:/ {print $2}')
+          echo "VOLUME_ID=$NEW_VOLUME" >> $GITHUB_ENV
+          sleep 10
+        else
+          echo "✅ Volume sudah ada: $EXISTING_VOLUME"
+          echo "VOLUME_ID=$EXISTING_VOLUME" >> $GITHUB_ENV
+        fi
+
+    - name: Deploy App to Fly.io
+      env:
+        FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        FLY_APP_NAME: ${{ secrets.FLY_APP_NAME }}
+        VOLUME_ID: ${{ env.VOLUME_ID }}
+      run: |
+        set -e
+        export FLYCTL_INSTALL="/home/runner/.fly"
+        export PATH="$FLYCTL_INSTALL/bin:$PATH"
+
+        if [ -z "$FLY_APP_NAME" ]; then
+          echo "❌ ERROR: FLY_APP_NAME tidak ditemukan. Pastikan sudah diatur di GitHub Secrets!"
+          exit 1
+        fi
+
+        echo "🚀 Deploying to Fly.io..."
+        flyctl deploy --remote-only --strategy immediate --regions sin -a "$FLY_APP_NAME"
+
+    - name: Restart Fly.io App
+      run: |
+        set -e
+        export FLYCTL_INSTALL="/home/runner/.fly"
+        export PATH="$FLYCTL_INSTALL/bin:$PATH"
+
+        echo "🔄 Mencari Machine ID untuk restart..."
+        MACHINE_ID=$(flyctl machines list --json | jq -r '.[0].id')
+
+        if [ -n "$MACHINE_ID" ] && [ "$MACHINE_ID" != "null" ]; then
+          echo "🔄 Restarting Fly.io App dengan Machine ID: $MACHINE_ID"
+          flyctl machines restart "$MACHINE_ID"
+        else
+          echo "❌ Tidak ada VM aktif untuk direstart."
+        fi
+        
 
   # 5️⃣ Notifikasi & Penyelesaian
   finish-and-notify:
