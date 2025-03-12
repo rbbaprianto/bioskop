@@ -1,57 +1,22 @@
-app = "bioskop"  # Ganti dengan nama aplikasi Fly.io
-
+# fly.toml
+app = "bioskop"
 primary_region = "sin"
 
 [build]
-  image = "registry.fly.io/bioskop:latest"
+  image = "bioskop:latest"
+
+[env]
+  FLY_API_TOKEN = "{{ .Env.FLY_API_TOKEN }}"
+  TELEGRAM_BOT_TOKEN = "{{ .Env.TELEGRAM_BOT_TOKEN }}"
+  RPC_SECRET = "{{ .Env.RPC_SECRET }}"
+  SONARR_API_KEY = "{{ .Env.SONARR_API_KEY }}"
+  RADARR_API_KEY = "{{ .Env.RADARR_API_KEY }}"
+  BAZARR_API_KEY = "{{ .Env.BAZARR_API_KEY }}"
+  QBITTORRENT_USERNAME = "{{ .Env.QBITTORRENT_USERNAME }}"
+  QBITTORRENT_PASSWORD = "{{ .Env.QBITTORRENT_PASSWORD }}"
+  TAILSCALE_AUTHKEY = "{{ .Env.TAILSCALE_AUTHKEY }}"
+  FLY_VOLUME_ID = "{{ .Env.FLY_VOLUME_ID }}"
 
 [mounts]
-  source = "film_volume"
-  destination = "/film"
-  
-[deploy]
-  strategy = "immediate"
-
-
-[[services]]
-  internal_port = 8080
-  protocol = "tcp"
-
-  [[services.ports]]
-    port = 80
-    handlers = ["http"]
-  
-  [[services.ports]]
-    port = 443
-    handlers = ["tls", "http"]
-
-  [[services.ports]]
-    port = 8080
-    handlers = ["http"]
-
-  [[services.ports]]
-    port = 6880  # Aria2 RPC/WebUI
-
-  [[services.ports]]
-    port = 3000  # Uptime Kuma
-
-  [[services.ports]]
-    port = 8920  # Jellyfin HTTPS
-
-  [[services.ports]]
-    port = 7359  # Jellyfin auto-discovery
-
-  [[services.ports]]
-    port = 1900  # Jellyfin DLNA
-
-  [[services.ports]]
-    port = 5000  # API atau lainnya
-
-  [[services.ports]]
-    port = 9090  # Monitoring
-
-[[checks]]
-  type = "http"
-  port = 8080
-  interval = "10s"
-  timeout = "2s"
+  source = "media"
+  destination = "/media"

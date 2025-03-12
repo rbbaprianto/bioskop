@@ -12,49 +12,12 @@ Bioskop adalah sistem media server yang menggabungkan **Jellyfin, Aria2, rclone,
 - **Organizr**: Panel kontrol untuk menyatukan semua layanan.
 - **Netdata**: Monitoring kinerja server.
 
-
-## Layanan yang Ditambahkan:
-- ✅ Bazarr
-- ✅ Caddy (Reverse Proxy + HTTPS)
-- ✅ Tailscale
-- ✅ Sonarr & Radarr
-- ✅ Notifikasi Telegram/Discord
-- ✅ Dashy (UI Dashboard)
-
-
 ## Cara Install
+1. Clone repository: `git clone https://github.com/rbbaprianto/bioskop.git`
+2. Atur variabel lingkungan di `.env`.
+3. Deploy ke Fly.io: `flyctl deploy --remote-only`.
 
-### 1. Clone Repository
-```sh
-git clone https://github.com/rbbaprianto/bioskop.git
-cd bioskop
-```
-
-### 2. Atur secret GitHub di repository:
-   - `FLY_API_TOKEN`
-   - `TELEGRAM_BOT_TOKEN`
-   - `RPC_SECRET`
-   - `SONARR_API_KEY`
-   - `RADARR_API_KEY`
-   - `BAZARR_API_KEY`
-   - `QBITTORRENT_USERNAME`
-   - `QBITTORRENT_PASSWORD`
-   - `TAILSCALE_AUTHKEY`
-   - `FLY_VOLUME_ID`
-   
-   
-### 3. Deploy ke Fly.io
-Pastikan sudah login ke Fly.io:
-```sh
-flyctl auth login
-```
-
-Deploy dengan perintah:
-```sh
-flyctl deploy --remote-only
-```
-
-### 4. Start & Stop Server Lewat Telegram
+## Start & Stop Server Lewat Telegram
 Gunakan perintah ini di bot Telegram:
 - `/start_vm` → Menyalakan server
 - `/stop_vm` → Mematikan server
@@ -69,17 +32,17 @@ Gunakan perintah ini di bot Telegram:
 │── docker-compose.yml
 │── .env.example
 │── config/
-│   ├── jellyfin/      # Konfigurasi Jellyfin
-│   ├── rclone/        # Konfigurasi rclone
-│   ├── aria2/         # Konfigurasi aria2
-│   ├── kuma/          # Konfigurasi Uptime Kuma
-│   ├── bot/           # Script bot Telegram
+│   ├── jellyfin/
+│   ├── rclone/
+│   ├── aria2/
+│   ├── kuma/
+│   ├── bot/
 │── scripts/
-│   ├── start.sh       # Script inisialisasi
-│   ├── bot.py         # Bot Telegram
+│   ├── start.sh
+│   ├── bot.py
 │── .github/workflows/
-│   ├── deploy.yml     # Workflow GitHub Actions
-│── README.md          # Dokumentasi lengkap
+│   ├── deploy.yml
+│── README.md
 ```
 
 ## Lisensi

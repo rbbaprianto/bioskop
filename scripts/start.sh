@@ -1,12 +1,8 @@
 #!/bin/bash
+# scripts/start.sh
 
-# Mulai service utama
-service jellyfin start
-service qbittorrent-nox start
-service tailscaled start
-service supervisor start
+# Start Docker services
+docker-compose up -d
 
-# Jalankan pengecekan volume di background setiap 1 jam
-echo "0 * * * * root /scripts/extend_volume.sh >> /var/log/extend_volume.log 2>&1" >> /etc/crontab
-
-exec "$@"
+# Start Telegram bot
+python3 scripts/bot.py &

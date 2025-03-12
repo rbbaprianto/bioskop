@@ -1,143 +1,133 @@
-version: "3.8"
+# docker-compose.yml
+version: '3.8'
 
 services:
   jellyfin:
     image: jellyfin/jellyfin:latest
     container_name: jellyfin
-    restart: unless-stopped
-    network_mode: bridge
     ports:
       - "8096:8096"
     volumes:
       - ./config/jellyfin:/config
-      - ./media:/media
+      - /media:/media
+    restart: unless-stopped
+
+  aria2:
+    image: p3terx/aria2-pro:latest
+    container_name: aria2
     environment:
-      - JELLYFIN_PublishedServerUrl=http://localhost:8096
+      - RPC_SECRET=${RPC_SECRET}
+    volumes:
+      - ./config/aria2:/config
+      - /media:/downloads
+    restart: unless-stopped
 
   qbittorrent:
-    image: lscr.io/linuxserver/qbittorrent:latest
+    image: linuxserver/qbittorrent:latest
     container_name: qbittorrent
-    restart: unless-stopped
-    network_mode: bridge
-    ports:
-      - "8080:8080"
-      - "6881:6881/tcp"
-      - "6881:6881/udp"
-    volumes:
-      - ./config/qbittorrent:/config
-      - ./downloads:/downloads
     environment:
       - WEBUI_PORT=8080
       - PUID=1000
       - PGID=1000
-
-  sonarr:
-    image: linuxserver/sonarr:latest
-    container_name: sonarr
-    restart: unless-stopped
-    network_mode: bridge
     ports:
-      - "8989:8989"
+      - "8080:8080"
     volumes:
-      - ./config/sonarr:/config
-      - ./media:/media
-      - ./downloads:/downloads
-    environment:
-      - PUID=1000
-      - PGID=1000
-
-  radarr:
-    image: linuxserver/radarr:latest
-    container_name: radarr
+      - ./config/qbittorrent:/config
+      - /media:/downloads
     restart: unless-stopped
-    network_mode: bridge
-    ports:
-      - "7878:7878"
-    volumes:
-      - ./config/radarr:/config
-      - ./media:/media
-      - ./downloads:/downloads
-    environment:
-      - PUID=1000
-      - PGID=1000
-
-  bazarr:
-    image: linuxserver/bazarr:latest
-    container_name: bazarr
-    restart: unless-stopped
-    network_mode: bridge
-    ports:
-      - "6767:6767"
-    volumes:
-      - ./config/bazarr:/config
-      - ./media:/media
-      - ./downloads:/downloads
-    environment:
-      - PUID=1000
-      - PGID=1000
 
   prowlarr:
     image: linuxserver/prowlarr:latest
     container_name: prowlarr
-    restart: unless-stopped
-    network_mode: bridge
     ports:
       - "9696:9696"
     volumes:
       - ./config/prowlarr:/config
-    environment:
-      - PUID=1000
-      - PGID=1000
-
-  aria2:
-    image: p3terx/aria2-pro
-    container_name: aria2
     restart: unless-stopped
-    network_mode: bridge
-    ports:
-      - "6800:6800"
-    volumes:
-      - ./config/aria2:/config
-      - ./downloads:/downloads
-    environment:
-      - RPC_SECRET=mysecret
 
-  filebrowser:
-    image: filebrowser/filebrowser
-    container_name: filebrowser
-    restart: unless-stopped
-    network_mode: bridge
+  sonarr:
+    image: linuxserver/sonarr:latest
+    container_name: sonarr
     ports:
-      - "8081:80"
+      - "8989:8989"
     volumes:
-      - ./media:/srv
-      - ./config/filebrowser:/config
+      - ./config/sonarr:/config
+      - /media:/media
+    restart: unless-stopped
+
+  radarr:
+    image: linuxserver/radarr:latest
+    container_name: radarr
+    ports:
+      - "7878:7878"
+    volumes:
+      - ./config/radarr:/config
+      - /media:/media
+    restart: unless-stopped
+
+  bazarr:
+    image: linuxserver/bazarr:latest
+    container_name: bazarr
+    ports:
+      - "6767:6767"
+    volumes:
+      - ./config/bazarr:/config
+      - /media:/media
+    restart: unless-stopped
 
   uptime-kuma:
     image: louislam/uptime-kuma:latest
     container_name: uptime-kuma
-    restart: unless-stopped
-    network_mode: bridge
     ports:
       - "3001:3001"
     volumes:
-      - ./config/uptime-kuma:/config
-
-  bot:
-    build: ./scripts  # Gunakan Dockerfile khusus untuk bot
-    container_name: telegram-bot
+      - ./config/kuma:/app/data
     restart: unless-stopped
-    network_mode: bridge
-    environment:
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
 
-  dashboard:
-    image: lissy93/dashy:latest
-    container_name: dashy
-    restart: unless-stopped
-    network_mode: bridge
+  filebrowser:
+    image: filebrowser/filebrowser:latest
+    container_name: filebrowser
     ports:
-      - "4000:80"
+      - "8081:80"
     volumes:
-      - ./config/dashy:/config
+      - /media:/srv
+      - ./config/filebrowser:/config
+    restart: unless-stopped
+
+  organizr:
+    image: organizr/organizr:latest
+    container_name: organizr
+    ports:
+      - "8082:80"
+    volumes:
+      - ./config/organizr:/config
+    restart: unless-stopped
+
+  netdata:
+    image: netdata/netdata:latest
+    container_name: netdata
+    ports:
+      - "19999:19999"
+    volumes:
+      - ./config/netdata:/etc/netdata
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:latest
+    container_name: caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config/caddy:/data
+      - ./config/caddy:/config
+    restart: unless-stopped
+
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: tailscale
+    environment:
+      - TS_AUTHKEY=${TAILSCALE_AUTHKEY}
+    volumes:
+      - ./config/tailscale:/var/lib/tailscale
+    restart: unless-stopped

@@ -1,22 +1,21 @@
-# Gunakan Python 3.9 sebagai base image
-FROM python:3.9
+# Dockerfile
+FROM ubuntu:22.04
 
-# Tentukan direktori kerja
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    git \
+    docker.io \
+    docker-compose \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
 WORKDIR /app
 
-# Copy semua file ke dalam container
-COPY . /app
+# Copy project files
+COPY . .
 
-# Pastikan requirements.txt tersedia sebelum menjalankan pip install
-COPY scripts/requirements.txt /app/scripts/requirements.txt
-
-# Buat virtual environment dan install dependencies
-RUN python3 -m venv /app/venv \
-    && /app/venv/bin/pip install --upgrade pip \
-    && if [ -f "/app/scripts/requirements.txt" ]; then /app/venv/bin/pip install --no-cache-dir -r /app/scripts/requirements.txt; fi
-
-# Berikan izin eksekusi pada semua script di dalam folder scripts
-RUN chmod +x /app/scripts/*.sh
-
-# Tentukan command untuk menjalankan bot
-CMD ["/bin/sh", "/app/scripts/start.sh"]
+# Run initialization script
+RUN chmod +x scripts/start.sh
+CMD ["./scripts/start.sh"]
